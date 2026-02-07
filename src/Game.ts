@@ -226,9 +226,16 @@ export class Game {
     this.eventBus.on('view:loreIntro', () => this.showView(ViewMode.LORE_INTRO));
     this.eventBus.on('loreIntro:complete', () => this.showView(ViewMode.GALAXY));
     this.eventBus.on('view:galaxy', () => this.showView(ViewMode.GALAXY));
-    this.eventBus.on('view:system', ({ starId }) => {
+    this.eventBus.on('view:system', ({ starId, planetId }) => {
       this.selectedStarId = starId;
       this.showView(ViewMode.SYSTEM);
+      if (planetId) {
+        // Auto-select planet after system view loads
+        requestAnimationFrame(() => {
+          this.eventBus.emit('planet:selected', { planetId });
+          this.systemRenderer.selectPlanet(planetId);
+        });
+      }
     });
     this.eventBus.on('view:colony', ({ colonyId }) => {
       this.showView(ViewMode.COLONY);

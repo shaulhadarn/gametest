@@ -197,7 +197,6 @@ export class LoreIntroScreen implements ScreenComponent {
   private slides: IntroSlide[] = [];
   private raceColor = '#4488ff';
   private slideTransitioning = false;
-  private slideStartTime = 0;
 
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus;
@@ -207,7 +206,7 @@ export class LoreIntroScreen implements ScreenComponent {
     this.done = false;
     this.currentSlide = 0;
     this.slideTransitioning = false;
-    this.slideStartTime = performance.now();
+
 
     const raceId = this.state?.config?.playerRaceId || 'humans';
     const raceData = getRaceData(raceId);
@@ -235,7 +234,7 @@ export class LoreIntroScreen implements ScreenComponent {
         <div class="lore-slide-progress" id="lore-progress">
           ${this.slides.map((_, i) => `<div class="lore-slide-dot ${i === 0 ? 'active' : ''}" style="background:${i === 0 ? this.raceColor : 'rgba(255,255,255,0.2)'};"></div>`).join('')}
         </div>
-        <div class="lore-slide-hint" id="lore-hint">Click or press <span class="lore-key-hint">SPACE</span> to continue</div>
+        <button class="lore-slide-next-btn" id="lore-next-btn" style="border-color:${this.raceColor}88;color:${this.raceColor};">Next</button>
         <button class="lore-slide-skip-btn" id="lore-skip-btn">Skip Intro</button>
       </div>
     `;
@@ -262,6 +261,11 @@ export class LoreIntroScreen implements ScreenComponent {
     // Event handlers
     this.element.addEventListener('click', this.handleAdvance);
     document.addEventListener('keydown', this.handleKeyAdvance);
+
+    this.element.querySelector('#lore-next-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleAdvance();
+    });
 
     this.element.querySelector('#lore-skip-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -318,13 +322,19 @@ export class LoreIntroScreen implements ScreenComponent {
 
     setTimeout(() => {
       this.currentSlide++;
-      this.slideStartTime = performance.now();
+  
 
       // Update content
       const titleEl = this.element?.querySelector('#lore-slide-title');
       const textEl = this.element?.querySelector('#lore-slide-text');
       if (titleEl) titleEl.textContent = this.slides[this.currentSlide].title;
       if (textEl) textEl.textContent = this.slides[this.currentSlide].text;
+
+      // Update next button text on last slide
+      const nextBtn = this.element?.querySelector('#lore-next-btn');
+      if (nextBtn) {
+        nextBtn.textContent = this.currentSlide >= this.slides.length - 1 ? 'Begin' : 'Next';
+      }
 
       // Update progress dots
       this.element?.querySelectorAll('.lore-slide-dot').forEach((dot, i) => {
@@ -378,13 +388,6 @@ export class LoreIntroScreen implements ScreenComponent {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.globalAlpha = 1;
 
-    // Fade in hint after 1.5 seconds on first slide
-    const hintEl = this.element?.querySelector('#lore-hint') as HTMLElement;
-    if (hintEl) {
-      const elapsed = now - this.slideStartTime;
-      const hintAlpha = Math.min(0.6, Math.max(0, (elapsed - 1500) / 1000));
-      hintEl.style.opacity = hintAlpha.toString();
-    }
   };
 
   private finish(): void {

@@ -99,10 +99,11 @@ export class GalaxyMapUI implements ScreenComponent {
       this.eventBus.emit('view:system', { starId });
     });
 
-    // Wire up planet clicks - go to system view
+    // Wire up planet clicks - go to system view and show planet info
     panel.querySelectorAll('.planet-item').forEach(item => {
       item.addEventListener('click', () => {
-        this.eventBus.emit('view:system', { starId });
+        const planetId = (item as HTMLElement).dataset.planetId;
+        this.eventBus.emit('view:system', { starId, planetId: planetId || undefined });
       });
     });
   }

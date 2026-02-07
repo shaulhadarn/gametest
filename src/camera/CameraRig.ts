@@ -1,5 +1,6 @@
 // CameraRig.ts - Pivot/arm/camera hierarchy for AAA third-person camera
-// Created: Scene graph hierarchy with pivot (follows ship), arm (orbit rotation), camera (positioned at arm length)
+// Updated: removeFromScene now detaches camera from arm and resets transform,
+// so galaxy CameraController can position it directly after flight mode exits
 
 import * as THREE from 'three';
 import { CameraConfig } from './CameraConfig';
@@ -56,9 +57,20 @@ export class CameraRig {
   }
 
   /**
-   * Remove the rig from the scene. Call on cleanup.
+   * Remove the rig from the scene and detach the camera so other controllers can use it.
    */
   removeFromScene(): void {
+    // Detach camera from arm and fully reset its local transform
+    // so the galaxy CameraController can position it directly in world space
+    this.camera.removeFromParent();
+    this.camera.position.set(0, 0, 0);
+    this.camera.rotation.set(0, 0, 0);
+    this.camera.quaternion.identity();
+    this.camera.scale.set(1, 1, 1);
+    this.camera.fov = 60;
+    this.camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld(true);
+
     this.pivot.removeFromParent();
   }
 

@@ -1,7 +1,7 @@
 // StarRenderer.ts - Renders stars, glows, labels, and selection indicators in galaxy view
-// Updated: Added fog of war support - dims unexplored stars, hides their labels/glows
+// Updated: Fixed setVisible() to re-apply fog of war when returning to galaxy view,
+// preventing flash of all stars being visible before fog is applied
 // Added frustum culling (50-70% draw call reduction) + LOD system (vertex count reduction)
-// Frustum culling hides off-screen stars, LOD uses lower-poly meshes for distant stars
 // applyFogOfWar() dims unexplored stars, revealStars() restores them when fleets explore
 
 import * as THREE from 'three';
@@ -530,9 +530,16 @@ export class StarRenderer {
     if (this.starMesh) this.starMesh.visible = visible;
     if (this.starMeshLOD) this.starMeshLOD.visible = visible;
     if (this.starMeshLOD2) this.starMeshLOD2.visible = visible;
-    for (const glow of this.glowSprites) glow.visible = visible;
-    for (const label of this.labels) label.visible = visible;
-    for (const ind of this.ownerIndicators) ind.visible = visible;
+
+    if (visible && this.fogOfWarEnabled) {
+      // Re-apply fog of war so unexplored stars stay hidden
+      this.applyFogOfWar(this.exploredStars);
+    } else {
+      for (const glow of this.glowSprites) glow.visible = visible;
+      for (const label of this.labels) label.visible = visible;
+      for (const ind of this.ownerIndicators) ind.visible = visible;
+    }
+
     if (this.selectionRing) this.selectionRing.visible = visible && !!this.selectedStarId;
     if (this.selectionBeam) this.selectionBeam.visible = visible && !!this.selectedStarId;
   }

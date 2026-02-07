@@ -4,15 +4,19 @@ import { GameState } from '@/core/GameState';
 import { ScreenComponent } from '@/ui/UIManager';
 import { FlightRenderer } from '@/rendering/flight/FlightRenderer';
 
-const SHIP_SPEED = 25;
-const SHIP_BOOST_MULTIPLIER = 2.5;
-const SHIP_TURN_SPEED = 1.8;
-const SHIP_PITCH_SPEED = 1.2;
-const SHIP_ROLL_SPEED = 2.5;
-const SHIP_DRAG = 0.97;
-const CAMERA_DISTANCE = 8;
-const CAMERA_HEIGHT = 3;
-const CAMERA_LERP = 0.05;
+const SHIP_SPEED = 30;
+const SHIP_BOOST_MULTIPLIER = 3.0;
+const SHIP_TURN_SPEED = 2.2;
+const SHIP_PITCH_SPEED = 2.0;
+const SHIP_ROLL_SPEED = 3.0;
+const SHIP_MANUAL_ROLL_SPEED = 3.5;
+const SHIP_DRAG = 3.0; // per-second exponential decay factor
+const CAMERA_DISTANCE = 9;
+const CAMERA_HEIGHT = 3.2;
+const CAMERA_LERP = 0.08;
+const CAMERA_FOV_BASE = 60;
+const CAMERA_FOV_BOOST = 80;
+const CAMERA_FOV_LERP = 0.04;
 
 export class FlightUI implements ScreenComponent {
   private element: HTMLElement | null = null;
@@ -75,15 +79,62 @@ export class FlightUI implements ScreenComponent {
     this.element.innerHTML = `
       <div class="flight-hud">
         <div class="flight-hud-top">
-          <button class="btn flight-exit-btn" id="btn-exit-flight">Exit Flight</button>
+          <button class="btn flight-exit-btn" id="btn-exit-flight">EXIT</button>
+          <div class="flight-hud-top-center">
+            <div class="flight-heading-bar" id="flight-heading">
+              <span class="flight-heading-value" id="flight-heading-val">000</span>
+            </div>
+          </div>
           <div class="flight-speed-display">
-            <span class="flight-speed-label">SPEED</span>
+            <span class="flight-speed-label">VELOCITY</span>
             <span class="flight-speed-value" id="flight-speed">0</span>
+            <span class="flight-speed-unit">m/s</span>
           </div>
         </div>
-        <div class="flight-crosshair"></div>
+
+        <!-- Crosshair -->
+        <div class="flight-crosshair">
+          <div class="flight-crosshair-inner"></div>
+          <div class="flight-crosshair-line flight-crosshair-top"></div>
+          <div class="flight-crosshair-line flight-crosshair-bottom"></div>
+          <div class="flight-crosshair-line flight-crosshair-left"></div>
+          <div class="flight-crosshair-line flight-crosshair-right"></div>
+          <div class="flight-crosshair-dot"></div>
+        </div>
+
+        <!-- Left HUD panel: throttle & boost -->
+        <div class="flight-hud-left">
+          <div class="flight-throttle-gauge">
+            <div class="flight-gauge-label">THR</div>
+            <div class="flight-gauge-bar-bg">
+              <div class="flight-gauge-bar-fill" id="flight-throttle-fill"></div>
+            </div>
+            <div class="flight-gauge-value" id="flight-throttle-pct">0%</div>
+          </div>
+          <div class="flight-boost-indicator" id="flight-boost-indicator">
+            <span class="flight-boost-label">BOOST</span>
+          </div>
+        </div>
+
+        <!-- Right HUD panel: altitude & distance to nearest body -->
+        <div class="flight-hud-right">
+          <div class="flight-info-row">
+            <span class="flight-info-label">ALT</span>
+            <span class="flight-info-value" id="flight-alt">0</span>
+          </div>
+          <div class="flight-info-row">
+            <span class="flight-info-label">DIST</span>
+            <span class="flight-info-value" id="flight-dist">---</span>
+          </div>
+          <div class="flight-info-row">
+            <span class="flight-info-label">ROLL</span>
+            <span class="flight-info-value" id="flight-roll">0</span>
+          </div>
+        </div>
+
+        <!-- Bottom controls -->
         <div class="flight-controls-hint" id="flight-controls-hint">
-          <div class="flight-hint-desktop">Click to control | WASD Move | Mouse Steer | Shift Boost | ESC Exit</div>
+          <div class="flight-hint-desktop">WASD Move | Mouse Steer | Q/E Roll | Shift Boost | Space Up | Ctrl Down | Click to lock cursor</div>
           <div class="flight-hint-mobile">
             <div class="flight-touch-zone flight-touch-left" id="flight-touch-left">
               <div class="flight-touch-joystick-ring"></div>
@@ -176,7 +227,8 @@ export class FlightUI implements ScreenComponent {
     right.applyQuaternion(quat);
     up.applyQuaternion(quat);
 
-    const boost = (this.isBoosting || this.touchBoostActive) ? SHIP_BOOST_MULTIPLIER : 1;
+    this.isBoosting = this.keys.has('shift') || this.touchBoostActive;
+    const boost = this.isBoosting ? SHIP_BOOST_MULTIPLIER : 1;
     const speed = SHIP_SPEED * boost;
 
     // Steering from mouse (pointer lock) or touch
@@ -184,26 +236,34 @@ export class FlightUI implements ScreenComponent {
     let steerY = 0;
 
     if (this.isPointerLocked) {
-      steerX = this.mouseX * 0.002;
-      steerY = this.mouseY * 0.002;
-      this.mouseX *= 0.5;
-      this.mouseY *= 0.5;
+      steerX = this.mouseX * 0.003;
+      steerY = this.mouseY * 0.003;
+      // Smooth mouse decay (frame-independent)
+      const mouseDecay = Math.pow(0.1, dt);
+      this.mouseX *= mouseDecay;
+      this.mouseY *= mouseDecay;
     } else if (this.touchJoystickId !== null) {
-      steerX = this.touchJoystickDelta.x * 0.03;
-      steerY = this.touchJoystickDelta.y * 0.03;
+      steerX = this.touchJoystickDelta.x * 0.04;
+      steerY = this.touchJoystickDelta.y * 0.04;
     }
 
-    // Apply rotation
+    // Apply yaw and pitch (no pitch clamp - full free flight with loops)
     renderer.shipRotation.y -= steerX * SHIP_TURN_SPEED * dt;
-    renderer.shipRotation.x = THREE.MathUtils.clamp(
-      renderer.shipRotation.x - steerY * SHIP_PITCH_SPEED * dt,
-      -Math.PI * 0.4,
-      Math.PI * 0.4
-    );
+    renderer.shipRotation.x -= steerY * SHIP_PITCH_SPEED * dt;
 
-    // Roll into turns
-    const targetRoll = -steerX * 0.6;
-    renderer.shipRotation.z += (targetRoll - renderer.shipRotation.z) * SHIP_ROLL_SPEED * dt;
+    // Manual roll with Q/E
+    let manualRoll = 0;
+    if (this.keys.has('q')) manualRoll = 1;
+    if (this.keys.has('e')) manualRoll = -1;
+
+    if (manualRoll !== 0) {
+      renderer.shipRotation.z += manualRoll * SHIP_MANUAL_ROLL_SPEED * dt;
+    } else {
+      // Auto-roll into turns (only when not manually rolling)
+      const targetRoll = -steerX * 0.8;
+      const rollLerp = 1 - Math.pow(0.05, dt);
+      renderer.shipRotation.z += (targetRoll - renderer.shipRotation.z) * SHIP_ROLL_SPEED * rollLerp;
+    }
 
     // Thrust
     const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || this.touchThrottleActive;
@@ -213,7 +273,7 @@ export class FlightUI implements ScreenComponent {
       renderer.shipVelocity.addScaledVector(forward, speed * dt);
     }
     if (isBraking) {
-      renderer.shipVelocity.addScaledVector(forward, -speed * 0.5 * dt);
+      renderer.shipVelocity.addScaledVector(forward, -speed * 0.6 * dt);
     }
 
     // Strafe
@@ -232,44 +292,97 @@ export class FlightUI implements ScreenComponent {
       renderer.shipVelocity.addScaledVector(up, -speed * 0.5 * dt);
     }
 
-    // Drag
-    renderer.shipVelocity.multiplyScalar(SHIP_DRAG);
+    // Frame-rate independent drag: v *= e^(-drag * dt)
+    const dragFactor = Math.exp(-SHIP_DRAG * dt);
+    renderer.shipVelocity.multiplyScalar(dragFactor);
 
     // Apply velocity
     renderer.shipPosition.addScaledVector(renderer.shipVelocity, dt);
-
-    // Boost state
-    this.isBoosting = this.keys.has('shift');
   }
 
   private updateCamera(dt: number): void {
     const renderer = this.flightRenderer;
     const quat = new THREE.Quaternion().setFromEuler(renderer.shipRotation);
+    const speed = renderer.shipVelocity.length();
+
+    // Dynamic camera distance: pulls back slightly at high speed
+    const dynamicDist = CAMERA_DISTANCE + Math.min(speed * 0.08, 4);
+    const dynamicHeight = CAMERA_HEIGHT + Math.min(speed * 0.02, 1);
 
     // Camera position: behind and above the ship
-    const cameraOffset = new THREE.Vector3(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
+    const cameraOffset = new THREE.Vector3(0, dynamicHeight, dynamicDist);
     cameraOffset.applyQuaternion(quat);
     const desiredCameraPos = renderer.shipPosition.clone().add(cameraOffset);
 
-    // Look target: in front of the ship
-    const lookOffset = new THREE.Vector3(0, 0.5, -15);
+    // Look target: further ahead at high speed for forward-leaning feel
+    const lookDist = 15 + Math.min(speed * 0.3, 15);
+    const lookOffset = new THREE.Vector3(0, 0.3, -lookDist);
     lookOffset.applyQuaternion(quat);
     const desiredLookAt = renderer.shipPosition.clone().add(lookOffset);
 
-    // Smooth follow
+    // Smooth follow (frame-rate independent)
     const lerpFactor = 1 - Math.pow(1 - CAMERA_LERP, dt * 60);
     this.cameraTarget.lerp(desiredCameraPos, lerpFactor);
     this.cameraLookTarget.lerp(desiredLookAt, lerpFactor);
 
     this.camera.position.copy(this.cameraTarget);
     this.camera.lookAt(this.cameraLookTarget);
+
+    // Dynamic FOV: widens when boosting for speed sensation
+    const targetFov = this.isBoosting ? CAMERA_FOV_BOOST : CAMERA_FOV_BASE;
+    const fovLerp = 1 - Math.pow(1 - CAMERA_FOV_LERP, dt * 60);
+    this.camera.fov += (targetFov - this.camera.fov) * fovLerp;
+    this.camera.updateProjectionMatrix();
   }
 
   private updateHUD(): void {
-    const speedEl = this.element?.querySelector('#flight-speed');
-    if (speedEl) {
-      const speed = Math.floor(this.flightRenderer.shipVelocity.length() * 10);
-      speedEl.textContent = String(speed);
+    if (!this.element) return;
+    const renderer = this.flightRenderer;
+    const vel = renderer.shipVelocity.length();
+    const speed = Math.floor(vel * 10);
+
+    // Speed
+    const speedEl = this.element.querySelector('#flight-speed');
+    if (speedEl) speedEl.textContent = String(speed);
+
+    // Throttle gauge
+    const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || this.touchThrottleActive;
+    const throttlePct = isThrusting ? (this.isBoosting ? 100 : 65) : 0;
+    const fillEl = this.element.querySelector('#flight-throttle-fill') as HTMLElement | null;
+    if (fillEl) fillEl.style.height = `${throttlePct}%`;
+    const pctEl = this.element.querySelector('#flight-throttle-pct');
+    if (pctEl) pctEl.textContent = `${throttlePct}%`;
+
+    // Boost indicator
+    const boostEl = this.element.querySelector('#flight-boost-indicator') as HTMLElement | null;
+    if (boostEl) {
+      boostEl.classList.toggle('active', this.isBoosting);
+    }
+
+    // Altitude (Y position)
+    const altEl = this.element.querySelector('#flight-alt');
+    if (altEl) altEl.textContent = Math.floor(Math.abs(renderer.shipPosition.y)).toString();
+
+    // Distance to origin (sun)
+    const distEl = this.element.querySelector('#flight-dist');
+    if (distEl) {
+      const dist = Math.floor(renderer.shipPosition.length());
+      distEl.textContent = dist.toString();
+    }
+
+    // Roll angle
+    const rollEl = this.element.querySelector('#flight-roll');
+    if (rollEl) {
+      const rollDeg = Math.floor(THREE.MathUtils.radToDeg(renderer.shipRotation.z) % 360);
+      rollEl.textContent = `${rollDeg}°`;
+    }
+
+    // Heading (yaw)
+    const headingEl = this.element.querySelector('#flight-heading-val');
+    if (headingEl) {
+      let heading = Math.floor(THREE.MathUtils.radToDeg(-renderer.shipRotation.y) % 360);
+      if (heading < 0) heading += 360;
+      headingEl.textContent = String(heading).padStart(3, '0');
     }
   }
 

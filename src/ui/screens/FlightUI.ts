@@ -106,20 +106,20 @@ export class FlightUI implements ScreenComponent {
     });
 
     // Touch controls
-    const touchLeft = this.element.querySelector('#flight-touch-left');
+    const touchLeft = this.element.querySelector('#flight-touch-left') as HTMLElement | null;
     if (touchLeft) {
       touchLeft.addEventListener('touchstart', this.onTouchStartHandler, { passive: false });
       touchLeft.addEventListener('touchmove', this.onTouchMoveHandler, { passive: false });
       touchLeft.addEventListener('touchend', this.onTouchEndHandler, { passive: false });
     }
 
-    const throttleBtn = this.element.querySelector('#flight-touch-throttle');
+    const throttleBtn = this.element.querySelector('#flight-touch-throttle') as HTMLElement | null;
     if (throttleBtn) {
       throttleBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchThrottleActive = true; }, { passive: false });
       throttleBtn.addEventListener('touchend', () => { this.touchThrottleActive = false; });
     }
 
-    const boostBtn = this.element.querySelector('#flight-touch-boost');
+    const boostBtn = this.element.querySelector('#flight-touch-boost') as HTMLElement | null;
     if (boostBtn) {
       boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchBoostActive = true; }, { passive: false });
       boostBtn.addEventListener('touchend', () => { this.touchBoostActive = false; });

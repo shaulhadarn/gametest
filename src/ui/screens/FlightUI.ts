@@ -11,7 +11,9 @@ const SHIP_PITCH_SPEED = 2.0;
 const SHIP_ROLL_SPEED = 3.0;
 const SHIP_MANUAL_ROLL_SPEED = 3.5;
 const SHIP_DRAG = 3.0; // per-second exponential decay factor
-const CAMERA_DISTANCE = 9;
+const CAMERA_DISTANCE_MIN = 5;
+const CAMERA_DISTANCE_MAX = 40;
+const CAMERA_DISTANCE_DEFAULT = 12;
 const CAMERA_HEIGHT = 3.2;
 const CAMERA_LERP = 0.08;
 const CAMERA_FOV_BASE = 60;
@@ -33,12 +35,23 @@ export class FlightUI implements ScreenComponent {
   private isPointerLocked = false;
   private isBoosting = false;
 
-  // Touch state
+  // Touch state - steering joystick
   private touchJoystickId: number | null = null;
   private touchJoystickStart = { x: 0, y: 0 };
   private touchJoystickDelta = { x: 0, y: 0 };
   private touchThrottleActive = false;
   private touchBoostActive = false;
+
+  // Touch state - camera orbit (mobile)
+  private touchCameraId: number | null = null;
+  private touchCameraLastPos = { x: 0, y: 0 };
+  private touchPinchDist: number | null = null;
+
+  // Camera orbit angles (for mobile orbit camera)
+  private cameraOrbitTheta = 0; // horizontal orbit around ship
+  private cameraOrbitPhi = 0.3; // vertical orbit angle (0 = behind, positive = above)
+  private cameraDistance = CAMERA_DISTANCE_DEFAULT;
+  private isMobile = false;
 
   // Camera smooth follow
   private cameraTarget = new THREE.Vector3();
@@ -53,6 +66,10 @@ export class FlightUI implements ScreenComponent {
   private onTouchStartHandler: (e: TouchEvent) => void;
   private onTouchMoveHandler: (e: TouchEvent) => void;
   private onTouchEndHandler: (e: TouchEvent) => void;
+  private onCanvasTouchStart: (e: TouchEvent) => void;
+  private onCanvasTouchMove: (e: TouchEvent) => void;
+  private onCanvasTouchEnd: (e: TouchEvent) => void;
+  private onWheel: (e: WheelEvent) => void;
 
   constructor(eventBus: EventBus, flightRenderer: FlightRenderer, camera: THREE.PerspectiveCamera) {
     this.eventBus = eventBus;
@@ -67,6 +84,10 @@ export class FlightUI implements ScreenComponent {
     this.onTouchStartHandler = this.handleTouchStart.bind(this);
     this.onTouchMoveHandler = this.handleTouchMove.bind(this);
     this.onTouchEndHandler = this.handleTouchEnd.bind(this);
+    this.onCanvasTouchStart = this.handleCanvasTouchStart.bind(this);
+    this.onCanvasTouchMove = this.handleCanvasTouchMove.bind(this);
+    this.onCanvasTouchEnd = this.handleCanvasTouchEnd.bind(this);
+    this.onWheel = this.handleWheel.bind(this);
   }
 
   setStarId(starId: string): void {
@@ -74,6 +95,14 @@ export class FlightUI implements ScreenComponent {
   }
 
   show(container: HTMLElement): void {
+    this.isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+
+    // Hide resource bar during flight
+    const resourceBar = document.querySelector('.resource-bar') as HTMLElement | null;
+    if (resourceBar) resourceBar.style.display = 'none';
+    const turnBtn = document.querySelector('.turn-button-container') as HTMLElement | null;
+    if (turnBtn) turnBtn.style.display = 'none';
+
     this.element = document.createElement('div');
     this.element.className = 'flight-ui fade-in';
     this.element.innerHTML = `
@@ -134,7 +163,7 @@ export class FlightUI implements ScreenComponent {
 
         <!-- Bottom controls -->
         <div class="flight-controls-hint" id="flight-controls-hint">
-          <div class="flight-hint-desktop">WASD Move | Mouse Steer | Q/E Roll | Shift Boost | Space Up | Ctrl Down | Click to lock cursor</div>
+          <div class="flight-hint-desktop">WASD Move | Mouse Steer | Q/E Roll | Shift Boost | Space Up | Ctrl Down | Scroll Zoom | Click to lock cursor</div>
           <div class="flight-hint-mobile">
             <div class="flight-touch-zone flight-touch-left" id="flight-touch-left">
               <div class="flight-touch-joystick-ring"></div>
@@ -156,7 +185,7 @@ export class FlightUI implements ScreenComponent {
       this.exitFlight();
     });
 
-    // Touch controls
+    // Touch controls - steering joystick
     const touchLeft = this.element.querySelector('#flight-touch-left') as HTMLElement | null;
     if (touchLeft) {
       touchLeft.addEventListener('touchstart', this.onTouchStartHandler, { passive: false });
@@ -176,16 +205,30 @@ export class FlightUI implements ScreenComponent {
       boostBtn.addEventListener('touchend', () => { this.touchBoostActive = false; });
     }
 
+    // Canvas touch controls for camera orbit (mobile)
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      canvas.addEventListener('touchstart', this.onCanvasTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', this.onCanvasTouchMove, { passive: false });
+      canvas.addEventListener('touchend', this.onCanvasTouchEnd, { passive: false });
+    }
+
     // Keyboard/mouse
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     document.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('click', this.onClick);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    window.addEventListener('wheel', this.onWheel, { passive: false });
+
+    // Reset camera orbit
+    this.cameraOrbitTheta = 0;
+    this.cameraOrbitPhi = 0.3;
+    this.cameraDistance = CAMERA_DISTANCE_DEFAULT;
 
     // Initialize camera behind ship
     const pos = this.flightRenderer.shipPosition;
-    this.camera.position.set(pos.x, pos.y + CAMERA_HEIGHT, pos.z + CAMERA_DISTANCE);
+    this.camera.position.set(pos.x, pos.y + CAMERA_HEIGHT, pos.z + this.cameraDistance);
     this.camera.lookAt(pos);
     this.cameraTarget.copy(this.camera.position);
     this.cameraLookTarget.copy(pos);
@@ -200,6 +243,20 @@ export class FlightUI implements ScreenComponent {
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('click', this.onClick);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    window.removeEventListener('wheel', this.onWheel);
+
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      canvas.removeEventListener('touchstart', this.onCanvasTouchStart);
+      canvas.removeEventListener('touchmove', this.onCanvasTouchMove);
+      canvas.removeEventListener('touchend', this.onCanvasTouchEnd);
+    }
+
+    // Restore resource bar
+    const resourceBar = document.querySelector('.resource-bar') as HTMLElement | null;
+    if (resourceBar) resourceBar.style.display = '';
+    const turnBtn = document.querySelector('.turn-button-container') as HTMLElement | null;
+    if (turnBtn) turnBtn.style.display = '';
 
     this.keys.clear();
     this.element?.remove();
@@ -231,7 +288,7 @@ export class FlightUI implements ScreenComponent {
     const boost = this.isBoosting ? SHIP_BOOST_MULTIPLIER : 1;
     const speed = SHIP_SPEED * boost;
 
-    // Steering from mouse (pointer lock) or touch
+    // Steering from mouse (pointer lock) or touch joystick
     let steerX = 0;
     let steerY = 0;
 
@@ -247,9 +304,11 @@ export class FlightUI implements ScreenComponent {
       steerY = this.touchJoystickDelta.y * 0.04;
     }
 
-    // Apply yaw and pitch (no pitch clamp - full free flight with loops)
+    // Apply yaw and pitch - CORRECT direction (not inverse)
+    // steerX positive = mouse/touch right = ship turns right (yaw decreases)
+    // steerY positive = mouse/touch down = ship pitches down (natural/non-inverse)
     renderer.shipRotation.y -= steerX * SHIP_TURN_SPEED * dt;
-    renderer.shipRotation.x -= steerY * SHIP_PITCH_SPEED * dt;
+    renderer.shipRotation.x += steerY * SHIP_PITCH_SPEED * dt;
 
     // Manual roll with Q/E
     let manualRoll = 0;
@@ -302,22 +361,34 @@ export class FlightUI implements ScreenComponent {
 
   private updateCamera(dt: number): void {
     const renderer = this.flightRenderer;
-    const quat = new THREE.Quaternion().setFromEuler(renderer.shipRotation);
+    const shipQuat = new THREE.Quaternion().setFromEuler(renderer.shipRotation);
     const speed = renderer.shipVelocity.length();
 
-    // Dynamic camera distance: pulls back slightly at high speed
-    const dynamicDist = CAMERA_DISTANCE + Math.min(speed * 0.08, 4);
+    // Dynamic distance: pulls back slightly at high speed
+    const dynamicDist = this.cameraDistance + Math.min(speed * 0.06, 3);
     const dynamicHeight = CAMERA_HEIGHT + Math.min(speed * 0.02, 1);
 
-    // Camera position: behind and above the ship
-    const cameraOffset = new THREE.Vector3(0, dynamicHeight, dynamicDist);
-    cameraOffset.applyQuaternion(quat);
-    const desiredCameraPos = renderer.shipPosition.clone().add(cameraOffset);
+    // Build camera offset using orbit angles (theta = horizontal, phi = vertical)
+    const sinTheta = Math.sin(this.cameraOrbitTheta);
+    const cosTheta = Math.cos(this.cameraOrbitTheta);
+    const sinPhi = Math.sin(this.cameraOrbitPhi);
+    const cosPhi = Math.cos(this.cameraOrbitPhi);
 
-    // Look target: further ahead at high speed for forward-leaning feel
-    const lookDist = 15 + Math.min(speed * 0.3, 15);
+    // Camera offset in ship-local space (orbit around ship)
+    const localOffset = new THREE.Vector3(
+      sinTheta * cosPhi * dynamicDist,
+      dynamicHeight + sinPhi * dynamicDist * 0.5,
+      cosTheta * cosPhi * dynamicDist
+    );
+
+    // Transform to world space using ship quaternion
+    localOffset.applyQuaternion(shipQuat);
+    const desiredCameraPos = renderer.shipPosition.clone().add(localOffset);
+
+    // Look target: slightly ahead of ship in world space
+    const lookDist = 10 + Math.min(speed * 0.2, 10);
     const lookOffset = new THREE.Vector3(0, 0.3, -lookDist);
-    lookOffset.applyQuaternion(quat);
+    lookOffset.applyQuaternion(shipQuat);
     const desiredLookAt = renderer.shipPosition.clone().add(lookOffset);
 
     // Smooth follow (frame-rate independent)
@@ -327,6 +398,12 @@ export class FlightUI implements ScreenComponent {
 
     this.camera.position.copy(this.cameraTarget);
     this.camera.lookAt(this.cameraLookTarget);
+
+    // Slowly return orbit angles to center when not being touched
+    if (this.touchCameraId === null) {
+      this.cameraOrbitTheta *= 0.95;
+      this.cameraOrbitPhi *= 0.95;
+    }
 
     // Dynamic FOV: widens when boosting for speed sensation
     const targetFov = this.isBoosting ? CAMERA_FOV_BOOST : CAMERA_FOV_BASE;
@@ -409,7 +486,7 @@ export class FlightUI implements ScreenComponent {
   }
 
   private handleClick(_e: MouseEvent): void {
-    if (!this.isPointerLocked && this.element) {
+    if (!this.isPointerLocked && this.element && !this.isMobile) {
       const canvas = document.querySelector('canvas');
       if (canvas) canvas.requestPointerLock();
     }
@@ -419,7 +496,16 @@ export class FlightUI implements ScreenComponent {
     this.isPointerLocked = !!document.pointerLockElement;
   }
 
-  // Touch controls
+  private handleWheel(e: WheelEvent): void {
+    e.preventDefault();
+    this.cameraDistance = THREE.MathUtils.clamp(
+      this.cameraDistance + e.deltaY * 0.01,
+      CAMERA_DISTANCE_MIN,
+      CAMERA_DISTANCE_MAX
+    );
+  }
+
+  // Touch controls - steering joystick (left zone)
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
     if (this.touchJoystickId === null && e.changedTouches.length > 0) {
@@ -452,6 +538,69 @@ export class FlightUI implements ScreenComponent {
         this.touchJoystickId = null;
         this.touchJoystickDelta = { x: 0, y: 0 };
       }
+    }
+  }
+
+  // Canvas touch - camera orbit and pinch zoom (mobile)
+  private handleCanvasTouchStart(e: TouchEvent): void {
+    // Don't intercept touches on UI elements
+    if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
+
+    if (e.touches.length === 1 && this.touchCameraId === null) {
+      const touch = e.touches[0];
+      this.touchCameraId = touch.identifier;
+      this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
+    } else if (e.touches.length === 2) {
+      // Pinch zoom start
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      this.touchPinchDist = Math.sqrt(dx * dx + dy * dy);
+    }
+  }
+
+  private handleCanvasTouchMove(e: TouchEvent): void {
+    if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
+    e.preventDefault();
+
+    if (e.touches.length === 1 && this.touchCameraId !== null) {
+      // Single finger drag = orbit camera
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === this.touchCameraId) {
+          const dx = touch.clientX - this.touchCameraLastPos.x;
+          const dy = touch.clientY - this.touchCameraLastPos.y;
+          this.cameraOrbitTheta += dx * 0.005;
+          this.cameraOrbitPhi = THREE.MathUtils.clamp(
+            this.cameraOrbitPhi + dy * 0.005,
+            -0.8,
+            1.2
+          );
+          this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
+        }
+      }
+    } else if (e.touches.length === 2 && this.touchPinchDist !== null) {
+      // Pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.sqrt(dx * dx + dy * dy);
+      const scale = this.touchPinchDist / newDist;
+      this.cameraDistance = THREE.MathUtils.clamp(
+        this.cameraDistance * scale,
+        CAMERA_DISTANCE_MIN,
+        CAMERA_DISTANCE_MAX
+      );
+      this.touchPinchDist = newDist;
+    }
+  }
+
+  private handleCanvasTouchEnd(e: TouchEvent): void {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === this.touchCameraId) {
+        this.touchCameraId = null;
+      }
+    }
+    if (e.touches.length < 2) {
+      this.touchPinchDist = null;
     }
   }
 

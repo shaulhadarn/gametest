@@ -654,7 +654,7 @@ export class Game {
       }
     }
 
-    this.uiManager.showScreen(mode);
+    this.uiManager.showScreen(mode, this.state || undefined);
     if (this.state) {
       this.uiManager.updateAll(this.state);
     }

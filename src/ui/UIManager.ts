@@ -33,7 +33,7 @@ export class UIManager {
     component.show(this.overlay);
   }
 
-  showScreen(mode: ViewMode): void {
+  showScreen(mode: ViewMode, state?: GameState): void {
     // Hide all non-persistent screens
     for (const [activeMode, screen] of this.screens) {
       if (this.activeScreens.has(activeMode)) {
@@ -42,9 +42,12 @@ export class UIManager {
     }
     this.activeScreens.clear();
 
-    // Show requested screen
+    // Show requested screen, passing state so it's available during show()
     const screen = this.screens.get(mode);
     if (screen) {
+      if (state) {
+        screen.update?.(state);
+      }
       screen.show(this.overlay);
       this.activeScreens.add(mode);
     }

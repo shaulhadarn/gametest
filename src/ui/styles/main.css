@@ -2496,29 +2496,37 @@
     right: 0;
   }
 
-  /* --- Star / Planet panels --- */
+  /* --- Star / Planet panels (centered modal on mobile) --- */
   .star-info-panel {
-    position: absolute;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 50vh;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 400px;
+    max-height: 80vh;
     overflow-y: auto;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    border-radius: var(--border-radius);
+    z-index: 160;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   }
 
   .planet-detail-panel {
-    position: absolute;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 50vh;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 400px;
+    max-height: 80vh;
     overflow-y: auto;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    border-radius: var(--border-radius);
+    z-index: 160;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   }
 
   /* --- Colony / Ship / Tech / Diplomacy grids --- */
@@ -2681,11 +2689,6 @@
   .turn-button {
     bottom: 16px;
     right: 16px;
-  }
-
-  /* --- Hamburger --- */
-  .hamburger-btn {
-    display: flex;
   }
 
   /* --- Settings --- */

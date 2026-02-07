@@ -46,7 +46,6 @@ import { SystemUI } from '@/ui/screens/SystemUI';
 import { LoreIntroScreen } from '@/ui/screens/LoreIntroScreen';
 import { ToastManager } from '@/ui/components/ToastManager';
 import { SettingsScreen } from '@/ui/screens/SettingsScreen';
-import { HamburgerButton } from '@/ui/components/HamburgerButton';
 
 // Input
 import { InputManager } from '@/input/InputManager';
@@ -206,7 +205,6 @@ export class Game {
     this.uiManager.registerPersistent(resourceBar);
     this.uiManager.registerPersistent(turnButton);
     this.uiManager.registerPersistent(new ToastManager(this.eventBus));
-    this.uiManager.registerPersistent(new HamburgerButton(this.eventBus));
   }
 
   private setupEvents(): void {

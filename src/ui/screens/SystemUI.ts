@@ -62,12 +62,19 @@ export class SystemUI implements ScreenComponent {
       <div class="system-nav">
         <button class="btn" id="btn-back-galaxy">Back to Galaxy</button>
         <span class="system-title" id="system-title"></span>
+        <button class="btn" id="btn-explore-flight">Explore</button>
       </div>
     `;
     container.appendChild(this.element);
 
     this.element.querySelector('#btn-back-galaxy')?.addEventListener('click', () => {
       this.eventBus.emit('view:galaxy', {});
+    });
+
+    this.element.querySelector('#btn-explore-flight')?.addEventListener('click', () => {
+      if (this.currentStarId) {
+        this.eventBus.emit('view:flight', { starId: this.currentStarId });
+      }
     });
 
     this.updateTitle();

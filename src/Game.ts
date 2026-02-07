@@ -28,6 +28,7 @@ import { CameraController } from '@/rendering/CameraController';
 import { RenderLoop } from '@/rendering/RenderLoop';
 import { GalaxyRenderer } from '@/rendering/galaxy/GalaxyRenderer';
 import { SystemRenderer } from '@/rendering/system/SystemRenderer';
+import { FlightRenderer } from '@/rendering/flight/FlightRenderer';
 
 // UI
 import { UIManager } from '@/ui/UIManager';
@@ -46,6 +47,7 @@ import { SystemUI } from '@/ui/screens/SystemUI';
 import { LoreIntroScreen } from '@/ui/screens/LoreIntroScreen';
 import { ToastManager } from '@/ui/components/ToastManager';
 import { SettingsScreen } from '@/ui/screens/SettingsScreen';
+import { FlightUI } from '@/ui/screens/FlightUI';
 
 // Input
 import { InputManager } from '@/input/InputManager';
@@ -92,6 +94,8 @@ export class Game {
   private renderLoop!: RenderLoop;
   private galaxyRenderer!: GalaxyRenderer;
   private systemRenderer!: SystemRenderer;
+  private flightRenderer!: FlightRenderer;
+  private flightUI!: FlightUI;
 
   // UI
   private uiManager!: UIManager;
@@ -129,6 +133,7 @@ export class Game {
     // Renderers
     this.galaxyRenderer = new GalaxyRenderer(this.sceneManager.scene, this.eventBus);
     this.systemRenderer = new SystemRenderer(this.sceneManager.scene, this.eventBus);
+    this.flightRenderer = new FlightRenderer(this.sceneManager.scene, this.eventBus);
 
     // Input
     this.inputManager = new InputManager(canvas, this.eventBus);
@@ -151,11 +156,16 @@ export class Game {
 
     // Render loop
     this.renderLoop.addCallback((dt) => {
-      this.cameraController.update(dt);
-      if (this.currentView === ViewMode.GALAXY) {
-        this.galaxyRenderer.update(this.sceneManager.camera, dt);
-      } else if (this.currentView === ViewMode.SYSTEM) {
-        this.systemRenderer.update(this.sceneManager.camera, dt);
+      if (this.currentView === ViewMode.FLIGHT) {
+        this.flightUI.updateFlight(dt);
+        this.flightRenderer.update(this.sceneManager.camera, dt);
+      } else {
+        this.cameraController.update(dt);
+        if (this.currentView === ViewMode.GALAXY) {
+          this.galaxyRenderer.update(this.sceneManager.camera, dt);
+        } else if (this.currentView === ViewMode.SYSTEM) {
+          this.systemRenderer.update(this.sceneManager.camera, dt);
+        }
       }
       this.sceneManager.render();
     });
@@ -198,6 +208,9 @@ export class Game {
     this.uiManager.registerScreen(ViewMode.DIPLOMACY, diplomacyScreen);
     this.uiManager.registerScreen(ViewMode.VICTORY, victoryScreen);
 
+    this.flightUI = new FlightUI(this.eventBus, this.flightRenderer, this.sceneManager.camera);
+    this.uiManager.registerScreen(ViewMode.FLIGHT, this.flightUI);
+
     // Settings screen (overlay, not a ViewMode screen)
     this.settingsScreen = new SettingsScreen(this.eventBus, this.settingsService, this.hotkeyManager);
 
@@ -223,6 +236,10 @@ export class Game {
     this.eventBus.on('view:research', () => this.showView(ViewMode.RESEARCH));
     this.eventBus.on('view:shipDesign', () => this.showView(ViewMode.SHIP_DESIGN));
     this.eventBus.on('view:diplomacy', () => this.showView(ViewMode.DIPLOMACY));
+    this.eventBus.on('view:flight', ({ starId }) => {
+      this.selectedStarId = starId;
+      this.showView(ViewMode.FLIGHT);
+    });
 
     // Settings overlay toggle
     this.eventBus.on('view:settings', () => {
@@ -581,17 +598,33 @@ export class Game {
   private showView(mode: ViewMode): void {
     this.currentView = mode;
 
-    if (mode === ViewMode.SYSTEM && this.selectedStarId) {
+    if (mode === ViewMode.FLIGHT && this.selectedStarId) {
+      // Entering flight mode: clear other renderers, build flight scene
+      this.galaxyRenderer.setVisible(false);
+      this.systemRenderer.clear();
+      this.flightRenderer.build(this.selectedStarId, this.state);
+      this.flightUI.setStarId(this.selectedStarId);
+      if (!this.savedGalaxyCameraState) {
+        this.savedGalaxyCameraState = this.cameraController.saveState();
+      }
+      this.sceneManager.bloomPass.strength = 0.6;
+      this.sceneManager.bloomPass.radius = 0.3;
+      this.sceneManager.bloomPass.threshold = 0.85;
+    } else if (mode === ViewMode.SYSTEM && this.selectedStarId) {
       // Entering system view: hide galaxy, build system, reposition camera
       this.galaxyRenderer.setVisible(false);
+      this.flightRenderer.clear();
       this.systemRenderer.build(this.selectedStarId, this.state);
       this.systemUI.setStarId(this.selectedStarId);
-      this.savedGalaxyCameraState = this.cameraController.saveState();
+      if (!this.savedGalaxyCameraState) {
+        this.savedGalaxyCameraState = this.cameraController.saveState();
+      }
       this.cameraController.setSystemView();
       this.sceneManager.setBloomForSystem();
     } else if (mode === ViewMode.GALAXY) {
       // Returning to galaxy view: clear system, show galaxy, restore camera
       this.systemRenderer.clear();
+      this.flightRenderer.clear();
       this.galaxyRenderer.setVisible(true);
       this.sceneManager.setBloomForGalaxy();
 

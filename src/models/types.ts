@@ -98,6 +98,7 @@ export enum ViewMode {
   DIPLOMACY = 'diplomacy',
   COMBAT = 'combat',
   VICTORY = 'victory',
+  FLIGHT = 'flight',
 }
 
 export interface Vec3 {

@@ -2884,6 +2884,229 @@
   background: rgba(68, 136, 255, 0.15);
 }
 
+/* ========== Flight Mode ========== */
+.flight-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.flight-hud {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.flight-hud-top {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: auto;
+}
+
+.flight-exit-btn {
+  font-size: 12px !important;
+  padding: 8px 16px !important;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.flight-exit-btn:hover {
+  opacity: 1;
+}
+
+.flight-speed-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: rgba(0, 8, 20, 0.6);
+  border: 1px solid rgba(68, 136, 255, 0.3);
+  border-radius: var(--border-radius);
+  padding: 8px 14px;
+}
+
+.flight-speed-label {
+  font-family: var(--font-display);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+}
+
+.flight-speed-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  color: var(--color-accent);
+  line-height: 1;
+}
+
+/* Crosshair */
+.flight-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.flight-crosshair::before,
+.flight-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(68, 136, 255, 0.4);
+}
+
+.flight-crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.flight-crosshair::after {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+/* Controls hints */
+.flight-controls-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.flight-hint-desktop {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  letter-spacing: 1px;
+  background: rgba(0, 8, 20, 0.5);
+  padding: 8px 20px;
+  border-radius: var(--border-radius);
+  display: inline-block;
+}
+
+/* Mobile touch controls */
+.flight-hint-mobile {
+  display: none;
+}
+
+.flight-touch-zone {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.flight-touch-left {
+  bottom: 30px;
+  left: 30px;
+}
+
+.flight-touch-joystick-ring {
+  width: 120px;
+  height: 120px;
+  border: 2px solid rgba(68, 136, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(68, 136, 255, 0.05);
+}
+
+.flight-touch-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(68, 136, 255, 0.5);
+  margin-top: 6px;
+}
+
+.flight-touch-buttons {
+  position: absolute;
+  bottom: 50px;
+  right: 30px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.flight-touch-btn {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid rgba(68, 136, 255, 0.3);
+  background: rgba(68, 136, 255, 0.08);
+  color: rgba(68, 136, 255, 0.7);
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.flight-touch-btn:active {
+  background: rgba(68, 136, 255, 0.25);
+  border-color: rgba(68, 136, 255, 0.6);
+  color: var(--color-accent);
+}
+
+.flight-touch-boost:active {
+  background: rgba(255, 170, 0, 0.2);
+  border-color: rgba(255, 170, 0, 0.5);
+  color: var(--color-warning);
+}
+
+@media (max-width: 768px) {
+  .flight-hint-desktop {
+    display: none;
+  }
+
+  .flight-hint-mobile {
+    display: block;
+  }
+
+  .flight-touch-buttons {
+    display: flex;
+  }
+
+  .flight-hud-top {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .flight-speed-display {
+    padding: 6px 10px;
+  }
+
+  .flight-speed-value {
+    font-size: 22px;
+  }
+}
+
 /* ========== Mobile Responsive ========== */
 @media (max-width: 768px) {
   .btn {

@@ -29,8 +29,8 @@ export const CameraConfig = {
   ZOOM_SMOOTHING: 8.0,
   COLLISION_SMOOTHING: 20.0,
 
-  // --- Shoulder Offset ---
-  SHOULDER_OFFSET_X: 1.0,
+  // --- Shoulder Offset (0 = centered behind ship) ---
+  SHOULDER_OFFSET_X: 0.0,
   SHOULDER_OFFSET_Y: 0.0,
 
   // --- Vertical Offset (pivot above ship) ---

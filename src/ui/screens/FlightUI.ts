@@ -1,6 +1,6 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Fixed mobile touch cleanup - reset all touch state on hide, touch-action in CSS
-// Document-level touch for pinch zoom, canvas drag steers ship
+// Updated: Fixed pinch zoom direction (pinch-out=zoom in), fixed joystick zone conflict
+// with document touch handler, document-level touch for pinch zoom, canvas drag steers ship
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -546,9 +546,9 @@ export class FlightUI implements ScreenComponent {
 
   // Document touch - ship steering (single finger) and pinch zoom (two fingers)
   private handleCanvasTouchStart(e: TouchEvent): void {
-    // Skip if touching interactive UI buttons (but allow pinch even on HUD)
+    // Skip if touching interactive UI elements (joystick, buttons) for single-finger
     const target = e.target as HTMLElement;
-    if (e.touches.length < 2 && target?.closest('.flight-exit-btn, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
+    if (e.touches.length < 2 && target?.closest('.flight-exit-btn, .flight-touch-zone, .flight-touch-left, .flight-touch-joystick-ring, .flight-touch-label, .flight-touch-buttons, .flight-touch-btn, .flight-touch-throttle, .flight-touch-boost')) return;
 
     if (e.touches.length >= 2) {
       // Two fingers: start pinch zoom
@@ -574,7 +574,7 @@ export class FlightUI implements ScreenComponent {
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const newDist = Math.sqrt(dx * dx + dy * dy);
       const pinchDelta = newDist - this.touchPinchDist;
-      this.frameZoomDelta -= pinchDelta * CameraConfig.PINCH_ZOOM_SPEED;
+      this.frameZoomDelta += pinchDelta * CameraConfig.PINCH_ZOOM_SPEED;
       this.touchPinchDist = newDist;
     } else if (e.touches.length === 1 && this.touchCameraId !== null && !this.isPinching) {
       // Single finger drag: steer ship + orbit camera

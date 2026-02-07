@@ -55,6 +55,7 @@ export class FlightRenderer {
   private engineGlowMeshes: THREE.Mesh[] = [];
   private dustParticles: THREE.Points | null = null;
   private bgStars: THREE.Points | null = null;
+  private nearStars: THREE.Points | null = null;
   private speedDust: THREE.Points | null = null;
   private time = 0;
   private active = false;
@@ -76,6 +77,11 @@ export class FlightRenderer {
 
     const star = state.stars[starId];
     if (!star) return;
+
+    // Scene ambient light so nothing is pure black
+    const ambient = new THREE.AmbientLight(0x334466, 0.3);
+    this.scene.add(ambient);
+    this.objects.push(ambient);
 
     // Build star system environment
     const sunColor = new THREE.Color(STAR_COLORS[star.type]);
@@ -240,48 +246,77 @@ export class FlightRenderer {
   }
 
   private buildStarfield(): void {
-    const count = 15000;
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
+    // Far background stars - fixed in world space for real parallax
+    const farCount = 12000;
+    const farPositions = new Float32Array(farCount * 3);
+    const farColors = new Float32Array(farCount * 3);
 
-    for (let i = 0; i < count; i++) {
-      // Distributed on a large sphere
+    for (let i = 0; i < farCount; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r = 800 + Math.random() * 1200;
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
+      const r = 600 + Math.random() * 900;
+      farPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      farPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      farPositions[i * 3 + 2] = r * Math.cos(phi);
 
-      // Color variety
       const t = Math.random();
-      if (t < 0.5) {
-        colors[i * 3] = 0.9; colors[i * 3 + 1] = 0.92; colors[i * 3 + 2] = 1.0;
-      } else if (t < 0.75) {
-        colors[i * 3] = 1.0; colors[i * 3 + 1] = 0.95; colors[i * 3 + 2] = 0.8;
-      } else if (t < 0.9) {
-        colors[i * 3] = 0.7; colors[i * 3 + 1] = 0.8; colors[i * 3 + 2] = 1.0;
+      if (t < 0.4) {
+        farColors[i * 3] = 0.9; farColors[i * 3 + 1] = 0.92; farColors[i * 3 + 2] = 1.0;
+      } else if (t < 0.65) {
+        farColors[i * 3] = 1.0; farColors[i * 3 + 1] = 0.95; farColors[i * 3 + 2] = 0.85;
+      } else if (t < 0.8) {
+        farColors[i * 3] = 0.7; farColors[i * 3 + 1] = 0.85; farColors[i * 3 + 2] = 1.0;
+      } else if (t < 0.92) {
+        farColors[i * 3] = 1.0; farColors[i * 3 + 1] = 0.8; farColors[i * 3 + 2] = 0.6;
       } else {
-        colors[i * 3] = 1.0; colors[i * 3 + 1] = 1.0; colors[i * 3 + 2] = 1.0;
+        farColors[i * 3] = 0.85; farColors[i * 3 + 1] = 0.7; farColors[i * 3 + 2] = 1.0;
       }
-
-      sizes[i] = 0.5 + Math.random() * 2.5;
     }
 
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geom.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    const farGeom = new THREE.BufferGeometry();
+    farGeom.setAttribute('position', new THREE.BufferAttribute(farPositions, 3));
+    farGeom.setAttribute('color', new THREE.BufferAttribute(farColors, 3));
 
-    const mat = new THREE.PointsMaterial({
-      size: 1.2, transparent: true, opacity: 0.85,
+    const farMat = new THREE.PointsMaterial({
+      size: 1.0, transparent: true, opacity: 0.8,
       sizeAttenuation: true, vertexColors: true, depthWrite: false,
     });
 
-    this.bgStars = new THREE.Points(geom, mat);
+    this.bgStars = new THREE.Points(farGeom, farMat);
     this.scene.add(this.bgStars);
     this.objects.push(this.bgStars);
+
+    // Nearby dynamic stars - closer, visible parallax when flying
+    const nearCount = 3000;
+    const nearPositions = new Float32Array(nearCount * 3);
+    const nearColors = new Float32Array(nearCount * 3);
+
+    for (let i = 0; i < nearCount; i++) {
+      const phi = Math.acos(2 * Math.random() - 1);
+      const theta = Math.random() * Math.PI * 2;
+      const r = 100 + Math.random() * 400;
+      nearPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      nearPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      nearPositions[i * 3 + 2] = r * Math.cos(phi);
+
+      const brightness = 0.5 + Math.random() * 0.5;
+      nearColors[i * 3] = brightness * 0.9;
+      nearColors[i * 3 + 1] = brightness * 0.95;
+      nearColors[i * 3 + 2] = brightness;
+    }
+
+    const nearGeom = new THREE.BufferGeometry();
+    nearGeom.setAttribute('position', new THREE.BufferAttribute(nearPositions, 3));
+    nearGeom.setAttribute('color', new THREE.BufferAttribute(nearColors, 3));
+
+    const nearMat = new THREE.PointsMaterial({
+      size: 0.6, transparent: true, opacity: 0.7,
+      sizeAttenuation: true, vertexColors: true, depthWrite: false,
+    });
+
+    this.nearStars = new THREE.Points(nearGeom, nearMat);
+    this.scene.add(this.nearStars);
+    this.objects.push(this.nearStars);
   }
 
   private buildSpaceDust(radius: number): void {
@@ -347,16 +382,16 @@ export class FlightRenderer {
     this.shipGroup = new THREE.Group();
 
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x3a4555, metalness: 0.85, roughness: 0.25,
+      color: 0x8899aa, metalness: 0.7, roughness: 0.3,
     });
     const panelMat = new THREE.MeshStandardMaterial({
-      color: 0x2a3545, metalness: 0.9, roughness: 0.2,
+      color: 0x6b7d8e, metalness: 0.75, roughness: 0.25,
     });
     const accentMat = new THREE.MeshStandardMaterial({
-      color: 0x556677, metalness: 0.7, roughness: 0.35,
+      color: 0x99aabb, metalness: 0.6, roughness: 0.35,
     });
     const darkMat = new THREE.MeshStandardMaterial({
-      color: 0x1a2030, metalness: 0.95, roughness: 0.15,
+      color: 0x445566, metalness: 0.85, roughness: 0.2,
     });
 
     // === Main fuselage - tapered nose to wide mid to narrow tail ===
@@ -560,13 +595,24 @@ export class FlightRenderer {
     this.shipGroup.add(this.engineGlow);
 
     // === Lighting for the ship ===
-    const shipLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    shipLight.position.set(2, 4, -3);
+    // Strong key light from front-above
+    const shipLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    shipLight.position.set(2, 5, -4);
     this.shipGroup.add(shipLight);
 
-    const fillLight = new THREE.DirectionalLight(0x334466, 0.3);
-    fillLight.position.set(-2, -1, 1);
+    // Fill light from left-below
+    const fillLight = new THREE.DirectionalLight(0x6688aa, 0.6);
+    fillLight.position.set(-3, -1, 1);
     this.shipGroup.add(fillLight);
+
+    // Rim light from behind
+    const rimLight = new THREE.DirectionalLight(0x4488cc, 0.4);
+    rimLight.position.set(0, 1, 5);
+    this.shipGroup.add(rimLight);
+
+    // Hemisphere light for ambient fill (sky blue + dark ground)
+    const hemiLight = new THREE.HemisphereLight(0x8899bb, 0x223344, 0.5);
+    this.shipGroup.add(hemiLight);
 
     this.shipGroup.position.copy(this.shipPosition);
     this.scene.add(this.shipGroup);
@@ -633,9 +679,15 @@ export class FlightRenderer {
       this.speedDust.quaternion.copy(this.shipQuaternion);
     }
 
-    // Background stars follow camera loosely
+    // Background stars - fixed in world space (no following!)
+    // Add subtle twinkling by oscillating opacity
     if (this.bgStars) {
-      this.bgStars.position.copy(camera.position);
+      const mat = this.bgStars.material as THREE.PointsMaterial;
+      mat.opacity = 0.75 + Math.sin(this.time * 0.3) * 0.05;
+    }
+    if (this.nearStars) {
+      const mat = this.nearStars.material as THREE.PointsMaterial;
+      mat.opacity = 0.6 + Math.sin(this.time * 0.5 + 1.5) * 0.1;
     }
   }
 
@@ -678,6 +730,7 @@ export class FlightRenderer {
     this.engineGlowMeshes = [];
     this.dustParticles = null;
     this.bgStars = null;
+    this.nearStars = null;
     this.speedDust = null;
     this.active = false;
   }

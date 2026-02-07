@@ -364,6 +364,23 @@ export class ColonyScreen implements ScreenComponent {
       });
     });
 
+    // Rush build buttons
+    this.element.querySelectorAll('.build-queue-rush').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt((btn as HTMLElement).dataset.queueIdx || '0');
+        const item = colony.buildQueue[idx];
+        if (!item || !this.state) return;
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) return;
+        const remaining = item.cost - item.progress;
+        const rushCost = Math.ceil(remaining * 2);
+        if (player.credits < rushCost) return;
+        player.credits -= rushCost;
+        item.progress = item.cost;
+        this.render();
+      });
+    });
+
     // Add building button
     this.element.querySelector('#btn-add-building')?.addEventListener('click', () => {
       this.showBuildMenu(colony);
@@ -465,6 +482,11 @@ export class ColonyScreen implements ScreenComponent {
     const isShip = item.type === 'ship';
     const queueLen = colony.buildQueue.length;
 
+    // Rush cost: 2 credits per remaining production
+    const rushCost = Math.ceil(remaining * 2);
+    const player = this.state?.players[this.state.currentPlayerId];
+    const canRush = player && player.credits >= rushCost && remaining > 0;
+
     return `
       <div class="build-queue-item">
         <div class="build-queue-item-info">
@@ -478,6 +500,7 @@ export class ColonyScreen implements ScreenComponent {
             <div class="build-progress-fill" style="width:${progressPct}%"></div>
           </div>
           <div class="build-queue-item-cost">${Math.floor(item.progress)} / ${item.cost} production</div>
+          <button class="btn build-queue-rush ${canRush ? '' : 'btn-disabled'}" data-queue-idx="${index}" ${canRush ? '' : 'disabled'}>Buy ${rushCost} cr</button>
         </div>
         <div class="build-queue-item-controls">
           ${index > 0 ? `<button class="btn build-queue-up" data-queue-idx="${index}" title="Move up">&#9650;</button>` : ''}

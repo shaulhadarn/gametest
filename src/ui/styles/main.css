@@ -2541,6 +2541,27 @@
   margin-top: 2px;
 }
 
+.build-queue-rush {
+  font-size: 10px !important;
+  padding: 3px 10px !important;
+  margin-top: 4px;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.3) !important;
+  background: rgba(255, 215, 0, 0.06) !important;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.build-queue-rush:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.15) !important;
+  border-color: rgba(255, 215, 0, 0.5) !important;
+}
+
+.build-queue-rush.btn-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .build-queue-remove {
   padding: 4px 8px !important;
   font-size: 10px !important;

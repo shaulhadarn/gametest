@@ -16,6 +16,16 @@ export default defineConfig({
       '@ai': path.resolve(__dirname, './src/ai'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     open: true,

@@ -1,7 +1,7 @@
 // StarRenderer.ts - Renders stars, glows, labels, and selection indicators in galaxy view
-// Updated: applyFogOfWar now explicitly shows explored stars' glows/labels/indicators,
-// fixing glows missing after returning from flight mode
-// setVisible() re-applies fog of war to prevent flash of all stars
+// Updated: setVisible(true) now forces frustum recalculation with fresh camera matrix,
+// fixing glows not appearing until user interaction after returning from flight/system view
+// applyFogOfWar explicitly shows explored stars' glows/labels/indicators
 // Added frustum culling (50-70% draw call reduction) + LOD system (vertex count reduction)
 
 import * as THREE from 'three';
@@ -35,6 +35,7 @@ export class StarRenderer {
   private starPositions: Float32Array | null = null;
   private starVisibility: boolean[] = [];
   private lastCameraHash = '';
+  private forceNextUpdate = false;
 
   // LOD system
   private starLODLevels: number[] = []; // 0=high, 1=medium, 2=low detail
@@ -285,11 +286,17 @@ export class StarRenderer {
   private updateFrustumCulling(camera: THREE.Camera): void {
     if (!this.starMesh || !this.starPositions) return;
 
+    // Force camera matrix update to handle stale matrices after view transitions
+    if (this.forceNextUpdate) {
+      camera.updateMatrixWorld(true);
+    }
+
     // Create camera hash to detect changes
     const camHash = `${camera.position.x.toFixed(2)}_${camera.position.y.toFixed(2)}_${camera.position.z.toFixed(2)}_${camera.rotation.x.toFixed(2)}_${camera.rotation.y.toFixed(2)}_${camera.rotation.z.toFixed(2)}`;
     
-    // Only update frustum if camera moved significantly
-    if (camHash === this.lastCameraHash) return;
+    // Only update frustum if camera moved significantly (skip check if forced)
+    if (!this.forceNextUpdate && camHash === this.lastCameraHash) return;
+    this.forceNextUpdate = false;
     this.lastCameraHash = camHash;
 
     // Track camera position for LOD
@@ -547,6 +554,12 @@ export class StarRenderer {
 
     if (this.selectionRing) this.selectionRing.visible = visible && !!this.selectedStarId;
     if (this.selectionBeam) this.selectionBeam.visible = visible && !!this.selectedStarId;
+
+    // Force frustum recalculation on next update to handle stale camera matrices
+    if (visible) {
+      this.forceNextUpdate = true;
+      this.lastCameraHash = '';
+    }
   }
 
   clear(): void {

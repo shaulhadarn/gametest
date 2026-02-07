@@ -1416,95 +1416,125 @@
   z-index: 0;
 }
 
-.lore-intro-content {
+/* Slide-based intro */
+.lore-slide-content {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 1;
-  perspective: 400px;
+  padding: 40px 24px;
+  box-sizing: border-box;
+  transition: opacity 0.5s ease;
 }
 
-.lore-intro-crawl-container {
-  width: 600px;
-  max-width: 90vw;
-  height: 100%;
-  overflow: hidden;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 15%,
-    black 70%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 15%,
-    black 70%,
-    transparent 100%
-  );
+.lore-slide-race-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.lore-intro-crawl {
-  animation: loreCrawl 60s linear;
-  animation-fill-mode: forwards;
-  padding-top: 100vh;
-  will-change: transform;
+.lore-slide-emblem {
+  font-size: 48px;
+  line-height: 1;
 }
 
-@keyframes loreCrawl {
-  from { transform: translateY(0); }
-  to { transform: translateY(-250%); }
-}
-
-.lore-intro-title {
+.lore-slide-race-name {
   font-family: var(--font-display);
-  font-size: 42px;
+  font-size: 14px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.lore-slide-divider {
+  width: 120px;
+  height: 1px;
+  margin: 16px 0 32px;
+}
+
+.lore-slide-title {
+  font-family: var(--font-display);
+  font-size: 32px;
   font-weight: 900;
   color: var(--color-text-bright);
   text-align: center;
-  letter-spacing: 12px;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  margin-bottom: 16px;
-  text-shadow: 0 0 30px rgba(68, 136, 255, 0.4);
+  margin: 0 0 24px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
 }
 
-.lore-intro-divider {
-  width: 80px;
-  height: 1px;
-  background: linear-gradient(to right, transparent, var(--color-accent), transparent);
-  margin: 24px auto;
-}
-
-.lore-intro-paragraph {
-  font-size: 15px;
+.lore-slide-text {
+  font-size: 16px;
   color: var(--color-text);
   line-height: 1.9;
   text-align: center;
-  margin-bottom: 20px;
-  opacity: 0.9;
+  max-width: 600px;
+  margin: 0;
+  opacity: 0.85;
 }
 
-.lore-intro-controls {
+/* Slide footer with progress dots and controls */
+.lore-slide-footer {
   position: absolute;
-  bottom: 32px;
+  bottom: 28px;
   left: 0;
   width: 100%;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   z-index: 2;
 }
 
-.lore-intro-skip {
+.lore-slide-progress {
+  display: flex;
+  gap: 10px;
+}
+
+.lore-slide-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.lore-slide-dot.active {
+  transform: scale(1.3);
+}
+
+.lore-slide-hint {
   font-size: 12px;
   color: var(--color-text-dim);
   opacity: 0;
   transition: opacity 0.5s ease;
+}
+
+.lore-slide-skip-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  padding: 4px 14px;
   cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  pointer-events: auto;
+}
+
+.lore-slide-skip-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .lore-key-hint {
@@ -3671,19 +3701,25 @@
     font-size: 14px;
   }
 
-  /* --- Lore intro --- */
-  .lore-intro-title {
-    font-size: 28px;
-    letter-spacing: 6px;
+  /* --- Lore intro slides --- */
+  .lore-slide-emblem {
+    font-size: 36px;
   }
 
-  .lore-intro-paragraph {
+  .lore-slide-race-name {
+    font-size: 14px;
+    letter-spacing: 4px;
+  }
+
+  .lore-slide-title {
+    font-size: 24px;
+    letter-spacing: 3px;
+  }
+
+  .lore-slide-text {
     font-size: 13px;
     line-height: 1.7;
-  }
-
-  .lore-intro-crawl-container {
-    width: 90vw;
+    max-width: 90vw;
   }
 
   /* --- Victory --- */
@@ -4058,14 +4094,19 @@
     letter-spacing: 3px;
   }
 
-  /* --- Lore intro small --- */
-  .lore-intro-title {
-    font-size: 22px;
-    letter-spacing: 4px;
+  /* --- Lore intro slides small --- */
+  .lore-slide-emblem {
+    font-size: 28px;
   }
 
-  .lore-intro-paragraph {
+  .lore-slide-title {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+
+  .lore-slide-text {
     font-size: 12px;
+    line-height: 1.6;
   }
 
   /* --- Colony screen small --- */

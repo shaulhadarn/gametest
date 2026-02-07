@@ -1,20 +1,23 @@
+// FlightUI.ts - Third-person flight controls and camera for exploring star systems
+// Updated: Increased ship speed to 60, camera distance defaults scaled up for larger system
+
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
 import { GameState } from '@/core/GameState';
 import { ScreenComponent } from '@/ui/UIManager';
 import { FlightRenderer } from '@/rendering/flight/FlightRenderer';
 
-const SHIP_SPEED = 30;
+const SHIP_SPEED = 60;
 const SHIP_BOOST_MULTIPLIER = 3.0;
 const SHIP_TURN_SPEED = 2.2;
 const SHIP_PITCH_SPEED = 2.0;
 const SHIP_ROLL_SPEED = 3.0;
 const SHIP_MANUAL_ROLL_SPEED = 3.5;
 const SHIP_DRAG = 3.0; // per-second exponential decay factor
-const CAMERA_DISTANCE_MIN = 5;
-const CAMERA_DISTANCE_MAX = 40;
-const CAMERA_DISTANCE_DEFAULT = 12;
-const CAMERA_HEIGHT = 3.2;
+const CAMERA_DISTANCE_MIN = 8;
+const CAMERA_DISTANCE_MAX = 80;
+const CAMERA_DISTANCE_DEFAULT = 18;
+const CAMERA_HEIGHT = 4.5;
 const CAMERA_LERP = 0.08;
 const CAMERA_FOV_BASE = 60;
 const CAMERA_FOV_BOOST = 80;

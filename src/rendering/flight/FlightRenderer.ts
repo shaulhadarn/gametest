@@ -1,3 +1,7 @@
+// FlightRenderer.ts - Renders the 3rd-person flight mode solar system
+// Updated: Scaled up entire system ~5x (sun 40r, orbits 120+90*i, planets 3+size*2.4)
+// Starfield pushed to 3000-6000 range, space dust spread wider, sun light range 1500
+
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
 import { GameState } from '@/core/GameState';
@@ -98,7 +102,7 @@ export class FlightRenderer {
     this.buildStarfield();
 
     // Local space dust
-    const maxOrbit = 25 + planets.length * 18 + 40;
+    const maxOrbit = 120 + planets.length * 90 + 200;
     this.buildSpaceDust(maxOrbit);
 
     // Speed dust (particles that streak past when moving fast)
@@ -109,12 +113,12 @@ export class FlightRenderer {
 
     // Position ship near first planet
     if (planets.length > 0) {
-      this.shipPosition.set(35, 5, 15);
+      this.shipPosition.set(160, 15, 80);
     }
   }
 
   private buildSun(color: THREE.Color): void {
-    const sunGeom = new THREE.SphereGeometry(8, 32, 32);
+    const sunGeom = new THREE.SphereGeometry(40, 32, 32);
     this.sunMaterial = new THREE.ShaderMaterial({
       uniforms: { uColor: { value: color }, uTime: { value: 0 } },
       vertexShader: sunVert,
@@ -127,7 +131,7 @@ export class FlightRenderer {
     this.objects.push(sunMesh);
 
     // Sun glow
-    const glowGeom = new THREE.SphereGeometry(14, 16, 16);
+    const glowGeom = new THREE.SphereGeometry(70, 16, 16);
     const glowMat = new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.15, side: THREE.BackSide, toneMapped: false,
     });
@@ -137,13 +141,13 @@ export class FlightRenderer {
     this.objects.push(glowMesh);
 
     // Sun light
-    const sunLight = new THREE.PointLight(color.getHex(), 2, 300);
+    const sunLight = new THREE.PointLight(color.getHex(), 2, 1500);
     this.scene.add(sunLight);
     this.objects.push(sunLight);
   }
 
   private buildSunCorona(color: THREE.Color): void {
-    const coronaGeom = new THREE.PlaneGeometry(60, 60);
+    const coronaGeom = new THREE.PlaneGeometry(300, 300);
     this.coronaMaterial = new THREE.ShaderMaterial({
       uniforms: { uColor: { value: color.clone() }, uTime: { value: 0 } },
       vertexShader: sunCoronaVert,
@@ -160,13 +164,13 @@ export class FlightRenderer {
   }
 
   private buildPlanet(planet: Planet, orbitIndex: number): void {
-    const orbitRadius = 25 + orbitIndex * 18;
-    const planetSize = 1 + planet.size * 0.8;
+    const orbitRadius = 120 + orbitIndex * 90;
+    const planetSize = 3 + planet.size * 2.4;
     const palette = PLANET_PALETTES[planet.type] || PLANET_PALETTES.BARREN;
     const seed = this.hashString(planet.id);
 
     // Orbit ring
-    const orbitGeom = new THREE.RingGeometry(orbitRadius - 0.08, orbitRadius + 0.08, 128);
+    const orbitGeom = new THREE.RingGeometry(orbitRadius - 0.4, orbitRadius + 0.4, 128);
     const orbitMat = new THREE.MeshBasicMaterial({
       color: 0x334455, transparent: true, opacity: 0.2, side: THREE.DoubleSide,
     });
@@ -198,7 +202,7 @@ export class FlightRenderer {
     this.scene.add(planetMesh);
     this.objects.push(planetMesh);
 
-    const orbitSpeed = 0.015 / Math.sqrt(orbitRadius / 25);
+    const orbitSpeed = 0.008 / Math.sqrt(orbitRadius / 120);
 
     // Atmosphere
     let atmosphere: THREE.Mesh | null = null;
@@ -254,7 +258,7 @@ export class FlightRenderer {
     for (let i = 0; i < farCount; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r = 600 + Math.random() * 900;
+      const r = 3000 + Math.random() * 3000;
       farPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       farPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       farPositions[i * 3 + 2] = r * Math.cos(phi);
@@ -278,7 +282,7 @@ export class FlightRenderer {
     farGeom.setAttribute('color', new THREE.BufferAttribute(farColors, 3));
 
     const farMat = new THREE.PointsMaterial({
-      size: 1.0, transparent: true, opacity: 0.8,
+      size: 1.8, transparent: true, opacity: 0.8,
       sizeAttenuation: true, vertexColors: true, depthWrite: false,
     });
 
@@ -294,7 +298,7 @@ export class FlightRenderer {
     for (let i = 0; i < nearCount; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r = 100 + Math.random() * 400;
+      const r = 500 + Math.random() * 1500;
       nearPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       nearPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       nearPositions[i * 3 + 2] = r * Math.cos(phi);
@@ -310,7 +314,7 @@ export class FlightRenderer {
     nearGeom.setAttribute('color', new THREE.BufferAttribute(nearColors, 3));
 
     const nearMat = new THREE.PointsMaterial({
-      size: 0.6, transparent: true, opacity: 0.7,
+      size: 1.0, transparent: true, opacity: 0.7,
       sizeAttenuation: true, vertexColors: true, depthWrite: false,
     });
 
@@ -320,14 +324,14 @@ export class FlightRenderer {
   }
 
   private buildSpaceDust(radius: number): void {
-    const count = 600;
+    const count = 1200;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
 
     for (let i = 0; i < count; i++) {
-      const r = 5 + Math.random() * radius;
+      const r = 20 + Math.random() * radius;
       const theta = Math.random() * Math.PI * 2;
-      const y = (Math.random() - 0.5) * 30;
+      const y = (Math.random() - 0.5) * 120;
       positions[i * 3] = Math.cos(theta) * r;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = Math.sin(theta) * r;
@@ -358,9 +362,9 @@ export class FlightRenderer {
     const colors = new Float32Array(count * 3);
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 40;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
+      positions[i * 3] = (Math.random() - 0.5) * 60;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 30;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 120;
       colors[i * 3] = 0.6; colors[i * 3 + 1] = 0.7; colors[i * 3 + 2] = 1.0;
     }
 

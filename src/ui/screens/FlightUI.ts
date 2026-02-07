@@ -1,7 +1,7 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Fixed mouse Y-axis inversion for ship pitch (mouse up = ship up)
-// Refactored to use AAA FlightCameraController with unified input, pivot/arm/camera rig,
-// exponential decay smoothing, collision, shake, state transitions, and proper touch handling
+// Updated: Fixed mobile touch - canvas drag now steers ship, pinch zoom works properly,
+// smooth transition between single-finger steer and two-finger pinch
+// Fixed mouse Y-axis inversion for ship pitch (mouse up = ship up)
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -305,7 +305,7 @@ export class FlightUI implements ScreenComponent {
     let steerX = 0;
     let steerY = 0;
 
-    if (this.isPointerLocked) {
+    if (this.isPointerLocked || (this.isMobile && (Math.abs(this.mouseX) > 0.01 || Math.abs(this.mouseY) > 0.01))) {
       steerX = this.mouseX * 0.003;
       steerY = this.mouseY * 0.003;
       // Smooth mouse decay (frame-independent)
@@ -542,20 +542,22 @@ export class FlightUI implements ScreenComponent {
     }
   }
 
-  // Canvas touch - camera orbit and pinch zoom
+  // Canvas touch - ship steering (single finger) and pinch zoom (two fingers)
   private handleCanvasTouchStart(e: TouchEvent): void {
     if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
 
-    if (e.touches.length === 1 && this.touchCameraId === null && !this.isPinching) {
-      const touch = e.touches[0];
-      this.touchCameraId = touch.identifier;
-      this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
-    } else if (e.touches.length === 2) {
+    if (e.touches.length >= 2) {
+      // Two fingers: start pinch zoom
       this.isPinching = true;
-      this.touchCameraId = null; // Suppress orbit while pinching
+      this.touchCameraId = null;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       this.touchPinchDist = Math.sqrt(dx * dx + dy * dy);
+    } else if (e.touches.length === 1 && this.touchCameraId === null && !this.isPinching) {
+      // Single finger: start steering / camera orbit
+      const touch = e.touches[0];
+      this.touchCameraId = touch.identifier;
+      this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
     }
   }
 
@@ -563,27 +565,31 @@ export class FlightUI implements ScreenComponent {
     if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
     e.preventDefault();
 
-    if (e.touches.length === 1 && this.touchCameraId !== null && !this.isPinching) {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === this.touchCameraId) {
-          const dx = touch.clientX - this.touchCameraLastPos.x;
-          const dy = touch.clientY - this.touchCameraLastPos.y;
-          // Dead zone to prevent jitter
-          if (Math.abs(dx) > TOUCH_DEAD_ZONE || Math.abs(dy) > TOUCH_DEAD_ZONE) {
-            this.frameOrbitX += dx;
-            this.frameOrbitY += dy;
-          }
-          this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
-        }
-      }
-    } else if (e.touches.length === 2 && this.touchPinchDist !== null) {
+    if (e.touches.length >= 2 && this.touchPinchDist !== null) {
+      // Pinch zoom
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const newDist = Math.sqrt(dx * dx + dy * dy);
       const pinchDelta = newDist - this.touchPinchDist;
       this.frameZoomDelta -= pinchDelta * CameraConfig.PINCH_ZOOM_SPEED;
       this.touchPinchDist = newDist;
+    } else if (e.touches.length === 1 && this.touchCameraId !== null && !this.isPinching) {
+      // Single finger drag: steer ship + orbit camera
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === this.touchCameraId) {
+          const dx = touch.clientX - this.touchCameraLastPos.x;
+          const dy = touch.clientY - this.touchCameraLastPos.y;
+          if (Math.abs(dx) > TOUCH_DEAD_ZONE || Math.abs(dy) > TOUCH_DEAD_ZONE) {
+            this.frameOrbitX += dx;
+            this.frameOrbitY += dy;
+            // Also feed ship steering so dragging changes direction
+            this.mouseX += dx * 0.8;
+            this.mouseY += dy * 0.8;
+          }
+          this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
+        }
+      }
     }
   }
 
@@ -596,6 +602,12 @@ export class FlightUI implements ScreenComponent {
     if (e.touches.length < 2) {
       this.touchPinchDist = null;
       this.isPinching = false;
+      // If one finger remains after pinch, pick it up for steering
+      if (e.touches.length === 1) {
+        const remaining = e.touches[0];
+        this.touchCameraId = remaining.identifier;
+        this.touchCameraLastPos = { x: remaining.clientX, y: remaining.clientY };
+      }
     }
   }
 

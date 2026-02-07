@@ -1,7 +1,7 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Fixed mobile touch - canvas drag now steers ship, pinch zoom works properly,
-// smooth transition between single-finger steer and two-finger pinch
-// Fixed mouse Y-axis inversion for ship pitch (mouse up = ship up)
+// Updated: Fixed mobile pinch zoom by binding touch to document instead of canvas,
+// so second finger is captured even when landing on HUD overlay
+// Canvas drag steers ship, smooth finger transitions between steer and pinch
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -189,11 +189,12 @@ export class FlightUI implements ScreenComponent {
     `;
     container.appendChild(this.element);
 
-    // Set touch-action: none on canvas to prevent browser gestures
+    // Set touch-action: none on canvas and overlay to prevent browser gestures
     const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
     if (canvas) {
       canvas.style.touchAction = 'none';
     }
+    this.element.style.touchAction = 'none';
 
     // Wire events
     this.element.querySelector('#btn-exit-flight')?.addEventListener('click', (e) => {
@@ -221,12 +222,10 @@ export class FlightUI implements ScreenComponent {
       boostBtn.addEventListener('touchend', () => { this.touchBoostActive = false; });
     }
 
-    // Canvas touch controls for camera orbit (mobile)
-    if (canvas) {
-      canvas.addEventListener('touchstart', this.onCanvasTouchStart, { passive: false });
-      canvas.addEventListener('touchmove', this.onCanvasTouchMove, { passive: false });
-      canvas.addEventListener('touchend', this.onCanvasTouchEnd, { passive: false });
-    }
+    // Document-level touch for steering + pinch zoom (captures both fingers even on overlay)
+    document.addEventListener('touchstart', this.onCanvasTouchStart, { passive: false });
+    document.addEventListener('touchmove', this.onCanvasTouchMove, { passive: false });
+    document.addEventListener('touchend', this.onCanvasTouchEnd, { passive: false });
 
     // Keyboard/mouse
     window.addEventListener('keydown', this.onKeyDown);
@@ -257,11 +256,12 @@ export class FlightUI implements ScreenComponent {
     window.removeEventListener('wheel', this.onWheel);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
 
+    document.removeEventListener('touchstart', this.onCanvasTouchStart);
+    document.removeEventListener('touchmove', this.onCanvasTouchMove);
+    document.removeEventListener('touchend', this.onCanvasTouchEnd);
+
     const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
     if (canvas) {
-      canvas.removeEventListener('touchstart', this.onCanvasTouchStart);
-      canvas.removeEventListener('touchmove', this.onCanvasTouchMove);
-      canvas.removeEventListener('touchend', this.onCanvasTouchEnd);
       canvas.style.touchAction = '';
     }
 
@@ -542,9 +542,11 @@ export class FlightUI implements ScreenComponent {
     }
   }
 
-  // Canvas touch - ship steering (single finger) and pinch zoom (two fingers)
+  // Document touch - ship steering (single finger) and pinch zoom (two fingers)
   private handleCanvasTouchStart(e: TouchEvent): void {
-    if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
+    // Skip if touching interactive UI buttons (but allow pinch even on HUD)
+    const target = e.target as HTMLElement;
+    if (e.touches.length < 2 && target?.closest('.flight-exit-btn, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
 
     if (e.touches.length >= 2) {
       // Two fingers: start pinch zoom
@@ -562,7 +564,6 @@ export class FlightUI implements ScreenComponent {
   }
 
   private handleCanvasTouchMove(e: TouchEvent): void {
-    if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
     e.preventDefault();
 
     if (e.touches.length >= 2 && this.touchPinchDist !== null) {

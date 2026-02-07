@@ -1,4 +1,5 @@
 // LoreIntroScreen.ts - Race-specific cinematic slide intro shown between New Game setup and Galaxy view
+// Updated: Added explicit setRaceId() method so Game.ts can pass the selected race directly before show()
 
 import { EventBus } from '@/core/EventBus';
 import { GameState } from '@/core/GameState';
@@ -197,9 +198,14 @@ export class LoreIntroScreen implements ScreenComponent {
   private slides: IntroSlide[] = [];
   private raceColor = '#4488ff';
   private slideTransitioning = false;
+  private explicitRaceId: string | null = null;
 
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus;
+  }
+
+  setRaceId(raceId: string): void {
+    this.explicitRaceId = raceId;
   }
 
   show(container: HTMLElement): void {
@@ -208,7 +214,7 @@ export class LoreIntroScreen implements ScreenComponent {
     this.slideTransitioning = false;
 
 
-    const raceId = this.state?.config?.playerRaceId || 'humans';
+    const raceId = this.explicitRaceId || this.state?.config?.playerRaceId || 'humans';
     const raceData = getRaceData(raceId);
 
     this.slides = RACE_SLIDES[raceId] || DEFAULT_SLIDES;

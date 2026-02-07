@@ -22,7 +22,7 @@ export interface GameEvents {
   'view:combat': { combatId: string };
   'view:mainMenu': {};
   'view:newGame': {};
-  'view:loreIntro': {};
+  'view:loreIntro': { raceId?: string };
   'view:settings': {};
   'view:flight': { starId: string };
 

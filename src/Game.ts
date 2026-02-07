@@ -107,6 +107,7 @@ export class Game {
 
   // UI screens
   private systemUI!: SystemUI;
+  private loreIntroScreen!: LoreIntroScreen;
 
   // View state
   private currentView: ViewMode = ViewMode.MAIN_MENU;
@@ -193,14 +194,14 @@ export class Game {
     const diplomacyScreen = new DiplomacyScreen(this.eventBus);
     const victoryScreen = new VictoryScreen(this.eventBus);
     const splashScreen = new SplashScreen(this.eventBus);
-    const loreIntroScreen = new LoreIntroScreen(this.eventBus);
+    this.loreIntroScreen = new LoreIntroScreen(this.eventBus);
     this.systemUI = new SystemUI(this.eventBus);
 
     this.uiManager.registerScreen(ViewMode.SPLASH, splashScreen);
     this.uiManager.registerScreen(ViewMode.SYSTEM, this.systemUI);
     this.uiManager.registerScreen(ViewMode.MAIN_MENU, mainMenu);
     this.uiManager.registerScreen(ViewMode.NEW_GAME, newGameSetup);
-    this.uiManager.registerScreen(ViewMode.LORE_INTRO, loreIntroScreen);
+    this.uiManager.registerScreen(ViewMode.LORE_INTRO, this.loreIntroScreen);
     this.uiManager.registerScreen(ViewMode.GALAXY, galaxyMapUI);
     this.uiManager.registerScreen(ViewMode.COLONY, colonyScreen);
     this.uiManager.registerScreen(ViewMode.RESEARCH, researchScreen);
@@ -423,7 +424,8 @@ export class Game {
     // Update UI
     this.uiManager.updateAll(this.state);
 
-    // Show lore intro before galaxy
+    // Show lore intro before galaxy — pass race explicitly
+    this.loreIntroScreen.setRaceId(config.playerRaceId);
     this.showView(ViewMode.LORE_INTRO);
 
     this.eventBus.emit('galaxy:generated', {});

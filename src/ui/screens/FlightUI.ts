@@ -1,5 +1,6 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Refactored to use AAA FlightCameraController with unified input, pivot/arm/camera rig,
+// Updated: Fixed mouse Y-axis inversion for ship pitch (mouse up = ship up)
+// Refactored to use AAA FlightCameraController with unified input, pivot/arm/camera rig,
 // exponential decay smoothing, collision, shake, state transitions, and proper touch handling
 
 import * as THREE from 'three';
@@ -318,7 +319,7 @@ export class FlightUI implements ScreenComponent {
 
     // Apply yaw and pitch
     renderer.shipRotation.y -= steerX * SHIP_TURN_SPEED * dt;
-    renderer.shipRotation.x -= steerY * SHIP_PITCH_SPEED * dt;
+    renderer.shipRotation.x += steerY * SHIP_PITCH_SPEED * dt;
 
     // Manual roll with Q/E
     let manualRoll = 0;

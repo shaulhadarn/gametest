@@ -1,6 +1,7 @@
 // FlightRenderer.ts - Renders the 3rd-person flight mode solar system
 // Updated: Scaled up entire system ~5x (sun 40r, orbits 120+90*i, planets 3+size*2.4)
 // Starfield pushed to 3000-6000 range, space dust spread wider, sun light range 1500
+// Added getScene() accessor for camera rig integration
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -73,6 +74,10 @@ export class FlightRenderer {
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
     this.eventBus = eventBus;
+  }
+
+  getScene(): THREE.Scene {
+    return this.scene;
   }
 
   build(starId: string, state: GameState): void {

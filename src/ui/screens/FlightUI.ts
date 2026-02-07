@@ -1,11 +1,14 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Increased ship speed to 60, camera distance defaults scaled up for larger system
+// Updated: Refactored to use AAA FlightCameraController with unified input, pivot/arm/camera rig,
+// exponential decay smoothing, collision, shake, state transitions, and proper touch handling
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
 import { GameState } from '@/core/GameState';
 import { ScreenComponent } from '@/ui/UIManager';
 import { FlightRenderer } from '@/rendering/flight/FlightRenderer';
+import { FlightCameraController, CameraInput } from '@/camera/FlightCameraController';
+import { CameraConfig } from '@/camera/CameraConfig';
 
 const SHIP_SPEED = 60;
 const SHIP_BOOST_MULTIPLIER = 3.0;
@@ -14,14 +17,7 @@ const SHIP_PITCH_SPEED = 2.0;
 const SHIP_ROLL_SPEED = 3.0;
 const SHIP_MANUAL_ROLL_SPEED = 3.5;
 const SHIP_DRAG = 3.0; // per-second exponential decay factor
-const CAMERA_DISTANCE_MIN = 8;
-const CAMERA_DISTANCE_MAX = 80;
-const CAMERA_DISTANCE_DEFAULT = 18;
-const CAMERA_HEIGHT = 4.5;
-const CAMERA_LERP = 0.08;
-const CAMERA_FOV_BASE = 60;
-const CAMERA_FOV_BOOST = 80;
-const CAMERA_FOV_LERP = 0.04;
+const TOUCH_DEAD_ZONE = 2;
 
 export class FlightUI implements ScreenComponent {
   private element: HTMLElement | null = null;
@@ -31,6 +27,9 @@ export class FlightUI implements ScreenComponent {
   private camera: THREE.PerspectiveCamera;
   private currentStarId: string | null = null;
 
+  // AAA Camera controller
+  private cameraController: FlightCameraController | null = null;
+
   // Input state
   private keys = new Set<string>();
   private mouseX = 0;
@@ -38,27 +37,28 @@ export class FlightUI implements ScreenComponent {
   private isPointerLocked = false;
   private isBoosting = false;
 
-  // Touch state - steering joystick
+  // Touch state - steering joystick (left zone for ship control)
   private touchJoystickId: number | null = null;
   private touchJoystickStart = { x: 0, y: 0 };
   private touchJoystickDelta = { x: 0, y: 0 };
   private touchThrottleActive = false;
   private touchBoostActive = false;
 
-  // Touch state - camera orbit (mobile)
+  // Touch state - camera orbit (right zone / canvas)
   private touchCameraId: number | null = null;
   private touchCameraLastPos = { x: 0, y: 0 };
   private touchPinchDist: number | null = null;
+  private isPinching = false;
 
-  // Camera orbit angles (for mobile orbit camera)
-  private cameraOrbitTheta = 0; // horizontal orbit around ship
-  private cameraOrbitPhi = 0.3; // vertical orbit angle (0 = behind, positive = above)
-  private cameraDistance = CAMERA_DISTANCE_DEFAULT;
+  // Accumulated camera input per frame (unified output)
+  private frameOrbitX = 0;
+  private frameOrbitY = 0;
+  private frameZoomDelta = 0;
+
   private isMobile = false;
 
-  // Camera smooth follow
-  private cameraTarget = new THREE.Vector3();
-  private cameraLookTarget = new THREE.Vector3();
+  // Pre-allocated quaternion for ship (zero GC)
+  private shipQuat = new THREE.Quaternion();
 
   // Bound handlers
   private onKeyDown: (e: KeyboardEvent) => void;
@@ -73,6 +73,7 @@ export class FlightUI implements ScreenComponent {
   private onCanvasTouchMove: (e: TouchEvent) => void;
   private onCanvasTouchEnd: (e: TouchEvent) => void;
   private onWheel: (e: WheelEvent) => void;
+  private onVisibilityChange: () => void;
 
   constructor(eventBus: EventBus, flightRenderer: FlightRenderer, camera: THREE.PerspectiveCamera) {
     this.eventBus = eventBus;
@@ -91,6 +92,7 @@ export class FlightUI implements ScreenComponent {
     this.onCanvasTouchMove = this.handleCanvasTouchMove.bind(this);
     this.onCanvasTouchEnd = this.handleCanvasTouchEnd.bind(this);
     this.onWheel = this.handleWheel.bind(this);
+    this.onVisibilityChange = this.handleVisibilityChange.bind(this);
   }
 
   setStarId(starId: string): void {
@@ -99,6 +101,10 @@ export class FlightUI implements ScreenComponent {
 
   show(container: HTMLElement): void {
     this.isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+
+    // Create camera controller
+    this.cameraController = new FlightCameraController(this.camera, this.isMobile);
+    this.cameraController.activate(this.flightRenderer.getScene());
 
     // Hide resource bar during flight
     const resourceBar = document.querySelector('.resource-bar') as HTMLElement | null;
@@ -182,6 +188,12 @@ export class FlightUI implements ScreenComponent {
     `;
     container.appendChild(this.element);
 
+    // Set touch-action: none on canvas to prevent browser gestures
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (canvas) {
+      canvas.style.touchAction = 'none';
+    }
+
     // Wire events
     this.element.querySelector('#btn-exit-flight')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -209,7 +221,6 @@ export class FlightUI implements ScreenComponent {
     }
 
     // Canvas touch controls for camera orbit (mobile)
-    const canvas = document.querySelector('canvas');
     if (canvas) {
       canvas.addEventListener('touchstart', this.onCanvasTouchStart, { passive: false });
       canvas.addEventListener('touchmove', this.onCanvasTouchMove, { passive: false });
@@ -223,36 +234,34 @@ export class FlightUI implements ScreenComponent {
     document.addEventListener('click', this.onClick);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
     window.addEventListener('wheel', this.onWheel, { passive: false });
-
-    // Reset camera orbit
-    this.cameraOrbitTheta = 0;
-    this.cameraOrbitPhi = 0.3;
-    this.cameraDistance = CAMERA_DISTANCE_DEFAULT;
-
-    // Initialize camera behind ship
-    const pos = this.flightRenderer.shipPosition;
-    this.camera.position.set(pos.x, pos.y + CAMERA_HEIGHT, pos.z + this.cameraDistance);
-    this.camera.lookAt(pos);
-    this.cameraTarget.copy(this.camera.position);
-    this.cameraLookTarget.copy(pos);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   hide(): void {
     if (document.pointerLockElement) {
       document.exitPointerLock();
     }
+
+    // Deactivate camera controller
+    if (this.cameraController) {
+      this.cameraController.deactivate();
+      this.cameraController = null;
+    }
+
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('click', this.onClick);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     window.removeEventListener('wheel', this.onWheel);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
 
-    const canvas = document.querySelector('canvas');
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
     if (canvas) {
       canvas.removeEventListener('touchstart', this.onCanvasTouchStart);
       canvas.removeEventListener('touchmove', this.onCanvasTouchMove);
       canvas.removeEventListener('touchend', this.onCanvasTouchEnd);
+      canvas.style.touchAction = '';
     }
 
     // Restore resource bar
@@ -272,7 +281,7 @@ export class FlightUI implements ScreenComponent {
 
   updateFlight(deltaTime: number): void {
     this.updateShipMovement(deltaTime);
-    this.updateCamera(deltaTime);
+    this.updateCameraController(deltaTime);
     this.updateHUD();
   }
 
@@ -307,9 +316,7 @@ export class FlightUI implements ScreenComponent {
       steerY = this.touchJoystickDelta.y * 0.04;
     }
 
-    // Apply yaw and pitch - CORRECT direction (not inverse)
-    // steerX positive = mouse/touch right = ship turns right (yaw decreases)
-    // steerY positive = mouse/touch down = ship pitches down (natural/non-inverse)
+    // Apply yaw and pitch
     renderer.shipRotation.y -= steerX * SHIP_TURN_SPEED * dt;
     renderer.shipRotation.x -= steerY * SHIP_PITCH_SPEED * dt;
 
@@ -321,7 +328,6 @@ export class FlightUI implements ScreenComponent {
     if (manualRoll !== 0) {
       renderer.shipRotation.z += manualRoll * SHIP_MANUAL_ROLL_SPEED * dt;
     } else {
-      // Auto-roll into turns (only when not manually rolling)
       const targetRoll = -steerX * 0.8;
       const rollLerp = 1 - Math.pow(0.05, dt);
       renderer.shipRotation.z += (targetRoll - renderer.shipRotation.z) * SHIP_ROLL_SPEED * rollLerp;
@@ -354,7 +360,7 @@ export class FlightUI implements ScreenComponent {
       renderer.shipVelocity.addScaledVector(up, -speed * 0.5 * dt);
     }
 
-    // Frame-rate independent drag: v *= e^(-drag * dt)
+    // Frame-rate independent drag
     const dragFactor = Math.exp(-SHIP_DRAG * dt);
     renderer.shipVelocity.multiplyScalar(dragFactor);
 
@@ -362,57 +368,33 @@ export class FlightUI implements ScreenComponent {
     renderer.shipPosition.addScaledVector(renderer.shipVelocity, dt);
   }
 
-  private updateCamera(dt: number): void {
+  private updateCameraController(dt: number): void {
+    if (!this.cameraController) return;
+
     const renderer = this.flightRenderer;
-    const shipQuat = new THREE.Quaternion().setFromEuler(renderer.shipRotation);
-    const speed = renderer.shipVelocity.length();
+    this.shipQuat.setFromEuler(renderer.shipRotation);
 
-    // Dynamic distance: pulls back slightly at high speed
-    const dynamicDist = this.cameraDistance + Math.min(speed * 0.06, 3);
-    const dynamicHeight = CAMERA_HEIGHT + Math.min(speed * 0.02, 1);
+    // Build unified camera input from accumulated frame deltas
+    const input: CameraInput = {
+      orbitDeltaX: this.frameOrbitX,
+      orbitDeltaY: this.frameOrbitY,
+      zoomDelta: this.frameZoomDelta,
+      isBoosting: this.isBoosting,
+    };
 
-    // Build camera offset using orbit angles (theta = horizontal, phi = vertical)
-    const sinTheta = Math.sin(this.cameraOrbitTheta);
-    const cosTheta = Math.cos(this.cameraOrbitTheta);
-    const sinPhi = Math.sin(this.cameraOrbitPhi);
-    const cosPhi = Math.cos(this.cameraOrbitPhi);
-
-    // Camera offset in ship-local space (orbit around ship)
-    const localOffset = new THREE.Vector3(
-      sinTheta * cosPhi * dynamicDist,
-      dynamicHeight + sinPhi * dynamicDist * 0.5,
-      cosTheta * cosPhi * dynamicDist
+    // Update camera controller
+    this.cameraController.update(
+      renderer.shipPosition,
+      this.shipQuat,
+      renderer.shipVelocity,
+      input,
+      dt,
     );
 
-    // Transform to world space using ship quaternion
-    localOffset.applyQuaternion(shipQuat);
-    const desiredCameraPos = renderer.shipPosition.clone().add(localOffset);
-
-    // Look target: slightly ahead of ship in world space
-    const lookDist = 10 + Math.min(speed * 0.2, 10);
-    const lookOffset = new THREE.Vector3(0, 0.3, -lookDist);
-    lookOffset.applyQuaternion(shipQuat);
-    const desiredLookAt = renderer.shipPosition.clone().add(lookOffset);
-
-    // Smooth follow (frame-rate independent)
-    const lerpFactor = 1 - Math.pow(1 - CAMERA_LERP, dt * 60);
-    this.cameraTarget.lerp(desiredCameraPos, lerpFactor);
-    this.cameraLookTarget.lerp(desiredLookAt, lerpFactor);
-
-    this.camera.position.copy(this.cameraTarget);
-    this.camera.lookAt(this.cameraLookTarget);
-
-    // Slowly return orbit angles to center when not being touched
-    if (this.touchCameraId === null) {
-      this.cameraOrbitTheta *= 0.95;
-      this.cameraOrbitPhi *= 0.95;
-    }
-
-    // Dynamic FOV: widens when boosting for speed sensation
-    const targetFov = this.isBoosting ? CAMERA_FOV_BOOST : CAMERA_FOV_BASE;
-    const fovLerp = 1 - Math.pow(1 - CAMERA_FOV_LERP, dt * 60);
-    this.camera.fov += (targetFov - this.camera.fov) * fovLerp;
-    this.camera.updateProjectionMatrix();
+    // Reset accumulated input for next frame
+    this.frameOrbitX = 0;
+    this.frameOrbitY = 0;
+    this.frameZoomDelta = 0;
   }
 
   private updateHUD(): void {
@@ -483,6 +465,10 @@ export class FlightUI implements ScreenComponent {
 
   private handleMouseMove(e: MouseEvent): void {
     if (this.isPointerLocked) {
+      // Accumulate mouse movement as orbit input (raw pixels)
+      this.frameOrbitX += e.movementX;
+      this.frameOrbitY += e.movementY;
+      // Also accumulate for ship steering
       this.mouseX += e.movementX;
       this.mouseY += e.movementY;
     }
@@ -497,15 +483,26 @@ export class FlightUI implements ScreenComponent {
 
   private handlePointerLockChange(): void {
     this.isPointerLocked = !!document.pointerLockElement;
+    if (!this.isPointerLocked) {
+      this.mouseX = 0;
+      this.mouseY = 0;
+    }
   }
 
   private handleWheel(e: WheelEvent): void {
     e.preventDefault();
-    this.cameraDistance = THREE.MathUtils.clamp(
-      this.cameraDistance + e.deltaY * 0.01,
-      CAMERA_DISTANCE_MIN,
-      CAMERA_DISTANCE_MAX
-    );
+    this.frameZoomDelta += Math.sign(e.deltaY);
+  }
+
+  private handleVisibilityChange(): void {
+    // Reset accumulated input on tab resume to prevent huge delta spikes
+    if (!document.hidden) {
+      this.mouseX = 0;
+      this.mouseY = 0;
+      this.frameOrbitX = 0;
+      this.frameOrbitY = 0;
+      this.frameZoomDelta = 0;
+    }
   }
 
   // Touch controls - steering joystick (left zone)
@@ -544,17 +541,17 @@ export class FlightUI implements ScreenComponent {
     }
   }
 
-  // Canvas touch - camera orbit and pinch zoom (mobile)
+  // Canvas touch - camera orbit and pinch zoom
   private handleCanvasTouchStart(e: TouchEvent): void {
-    // Don't intercept touches on UI elements
     if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
 
-    if (e.touches.length === 1 && this.touchCameraId === null) {
+    if (e.touches.length === 1 && this.touchCameraId === null && !this.isPinching) {
       const touch = e.touches[0];
       this.touchCameraId = touch.identifier;
       this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
     } else if (e.touches.length === 2) {
-      // Pinch zoom start
+      this.isPinching = true;
+      this.touchCameraId = null; // Suppress orbit while pinching
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       this.touchPinchDist = Math.sqrt(dx * dx + dy * dy);
@@ -565,33 +562,26 @@ export class FlightUI implements ScreenComponent {
     if ((e.target as HTMLElement)?.closest('.flight-hud-top, .flight-touch-zone, .flight-touch-buttons, .flight-touch-btn')) return;
     e.preventDefault();
 
-    if (e.touches.length === 1 && this.touchCameraId !== null) {
-      // Single finger drag = orbit camera
+    if (e.touches.length === 1 && this.touchCameraId !== null && !this.isPinching) {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === this.touchCameraId) {
           const dx = touch.clientX - this.touchCameraLastPos.x;
           const dy = touch.clientY - this.touchCameraLastPos.y;
-          this.cameraOrbitTheta += dx * 0.005;
-          this.cameraOrbitPhi = THREE.MathUtils.clamp(
-            this.cameraOrbitPhi + dy * 0.005,
-            -0.8,
-            1.2
-          );
+          // Dead zone to prevent jitter
+          if (Math.abs(dx) > TOUCH_DEAD_ZONE || Math.abs(dy) > TOUCH_DEAD_ZONE) {
+            this.frameOrbitX += dx;
+            this.frameOrbitY += dy;
+          }
           this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
         }
       }
     } else if (e.touches.length === 2 && this.touchPinchDist !== null) {
-      // Pinch zoom
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const newDist = Math.sqrt(dx * dx + dy * dy);
-      const scale = this.touchPinchDist / newDist;
-      this.cameraDistance = THREE.MathUtils.clamp(
-        this.cameraDistance * scale,
-        CAMERA_DISTANCE_MIN,
-        CAMERA_DISTANCE_MAX
-      );
+      const pinchDelta = newDist - this.touchPinchDist;
+      this.frameZoomDelta -= pinchDelta * CameraConfig.PINCH_ZOOM_SPEED;
       this.touchPinchDist = newDist;
     }
   }
@@ -604,6 +594,7 @@ export class FlightUI implements ScreenComponent {
     }
     if (e.touches.length < 2) {
       this.touchPinchDist = null;
+      this.isPinching = false;
     }
   }
 

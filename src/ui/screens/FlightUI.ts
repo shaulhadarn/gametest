@@ -170,19 +170,19 @@ export class FlightUI implements ScreenComponent {
           </div>
         </div>
 
-        <!-- Bottom controls -->
+        <!-- Bottom controls hint (desktop only) -->
         <div class="flight-controls-hint" id="flight-controls-hint">
           <div class="flight-hint-desktop">WASD Move | Mouse Steer | Q/E Roll | Shift Boost | Space Up | Ctrl Down | Scroll Zoom | Click to lock cursor</div>
-          <div class="flight-hint-mobile">
-            <div class="flight-touch-zone flight-touch-left" id="flight-touch-left">
-              <div class="flight-touch-joystick-ring"></div>
-              <div class="flight-touch-label">STEER</div>
-            </div>
-            <div class="flight-touch-buttons">
-              <button class="flight-touch-btn flight-touch-throttle" id="flight-touch-throttle">THRUST</button>
-              <button class="flight-touch-btn flight-touch-boost" id="flight-touch-boost">BOOST</button>
-            </div>
-          </div>
+        </div>
+
+        <!-- Mobile touch controls - direct children of flight-hud for correct absolute positioning -->
+        <div class="flight-touch-zone flight-touch-left" id="flight-touch-left">
+          <div class="flight-touch-joystick-ring"></div>
+          <div class="flight-touch-label">STEER</div>
+        </div>
+        <div class="flight-touch-buttons">
+          <button class="flight-touch-btn flight-touch-throttle" id="flight-touch-throttle">THRUST</button>
+          <button class="flight-touch-btn flight-touch-boost" id="flight-touch-boost">BOOST</button>
         </div>
       </div>
     `;
@@ -303,20 +303,22 @@ export class FlightUI implements ScreenComponent {
     const boost = this.isBoosting ? SHIP_BOOST_MULTIPLIER : 1;
     const speed = SHIP_SPEED * boost;
 
-    // Steering from mouse (pointer lock) or touch joystick
+    // Steering from mouse (pointer lock), canvas drag, and/or touch joystick
     let steerX = 0;
     let steerY = 0;
 
     if (this.isPointerLocked || (this.isMobile && (Math.abs(this.mouseX) > 0.01 || Math.abs(this.mouseY) > 0.01))) {
-      steerX = this.mouseX * 0.003;
-      steerY = this.mouseY * 0.003;
+      steerX += this.mouseX * 0.003;
+      steerY += this.mouseY * 0.003;
       // Smooth mouse decay (frame-independent)
       const mouseDecay = Math.pow(0.1, dt);
       this.mouseX *= mouseDecay;
       this.mouseY *= mouseDecay;
-    } else if (this.touchJoystickId !== null) {
-      steerX = this.touchJoystickDelta.x * 0.04;
-      steerY = this.touchJoystickDelta.y * 0.04;
+    }
+    // Joystick always adds on top (not exclusive with canvas drag)
+    if (this.touchJoystickId !== null) {
+      steerX += this.touchJoystickDelta.x * 0.04;
+      steerY += this.touchJoystickDelta.y * 0.04;
     }
 
     // Apply yaw and pitch

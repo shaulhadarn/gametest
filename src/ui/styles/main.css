@@ -3257,10 +3257,12 @@ canvas {
   height: 160px;
   border-radius: 50%;
   pointer-events: auto;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  z-index: 210;
+  touch-action: none;
 }
 
 .flight-touch-left {
@@ -3292,6 +3294,8 @@ canvas {
   flex-direction: column;
   gap: 12px;
   pointer-events: auto;
+  z-index: 210;
+  touch-action: none;
 }
 
 .flight-touch-btn {
@@ -3328,8 +3332,8 @@ canvas {
     display: none;
   }
 
-  .flight-hint-mobile {
-    display: block;
+  .flight-touch-zone {
+    display: flex;
   }
 
   .flight-touch-buttons {

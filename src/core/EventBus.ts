@@ -24,6 +24,7 @@ export interface GameEvents {
   'view:newGame': {};
   'view:loreIntro': {};
   'view:settings': {};
+  'view:flight': { starId: string };
 
   // Lore
   'loreIntro:complete': {};

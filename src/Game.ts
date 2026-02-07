@@ -342,6 +342,9 @@ export class Game {
           );
           this.galaxyRenderer.connectionLines.build(this.state.stars, exploredStarIds);
         }
+
+        // Check for first contact with other civilizations
+        this.checkFirstContact(fleet.playerId, starId);
       }
     });
 
@@ -614,6 +617,38 @@ export class Game {
     this.uiManager.showScreen(mode);
     if (this.state) {
       this.uiManager.updateAll(this.state);
+    }
+  }
+
+  private checkFirstContact(playerId: string, starId: string): void {
+    const star = this.state.stars[starId];
+    if (!star) return;
+
+    // Check the arrived star and its neighbors for other civilizations
+    const starsToCheck = [starId, ...star.warpLanes];
+    const checkedOwners = new Set<string>();
+
+    for (const sid of starsToCheck) {
+      const s = this.state.stars[sid];
+      if (!s || !s.ownerId || s.ownerId === playerId) continue;
+      if (checkedOwners.has(s.ownerId)) continue;
+      checkedOwners.add(s.ownerId);
+
+      const otherPlayer = this.state.players[s.ownerId];
+      if (!otherPlayer || !otherPlayer.alive) continue;
+
+      const madeContact = this.diplomacyService.makeContact(this.state, playerId, s.ownerId);
+      if (madeContact) {
+        const raceData = getRaceData(otherPlayer.raceId);
+        const raceName = raceData?.race.name || otherPlayer.name;
+        const emblem = raceData?.visuals.emblemIcon || '?';
+        this.eventBus.emit('diplomacy:firstContact', { playerId, otherPlayerId: s.ownerId });
+        this.eventBus.emit('ui:toast', {
+          message: `First Contact! The ${raceName} ${emblem} have been discovered!`,
+          icon: '\u{1F30D}',
+          color: raceData?.visuals.primaryColor || '#4488ff',
+        });
+      }
     }
   }
 

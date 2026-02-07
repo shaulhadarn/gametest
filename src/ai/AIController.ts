@@ -143,14 +143,41 @@ export class AIController {
       const isPlayer2 = rel.player2Id === player.id;
       if (!isPlayer1 && !isPlayer2) continue;
 
-      for (const proposal of rel.pendingProposals) {
+      const proposalsToHandle = [...rel.pendingProposals];
+      for (const proposal of proposalsToHandle) {
         if (proposal.toPlayerId !== player.id) continue;
 
         // Accept based on personality and reputation
         const acceptChance = (personality.diplomacyOpenness + rel.reputation / 100) / 2;
         if (this.rng.chance(Math.max(0.1, acceptChance))) {
-          // Accept (simplified - would call DiplomacyService)
+          // Accept: update status and treaties properly
+          switch (proposal.type) {
+            case 'peace':
+              rel.status = 'NEUTRAL' as any;
+              rel.reputation += 10;
+              break;
+            case 'non_aggression':
+              rel.status = 'NON_AGGRESSION' as any;
+              rel.treaties.push({ type: 'non_aggression', startTurn: state.turn });
+              rel.reputation += 5;
+              break;
+            case 'trade':
+              rel.status = 'TRADE' as any;
+              rel.treaties.push({ type: 'trade', startTurn: state.turn });
+              rel.reputation += 10;
+              break;
+            case 'alliance':
+              rel.status = 'ALLIANCE' as any;
+              rel.treaties.push({ type: 'alliance', startTurn: state.turn });
+              rel.reputation += 20;
+              break;
+          }
           rel.pendingProposals = rel.pendingProposals.filter(p => p !== proposal);
+          rel.reputation = Math.min(100, Math.max(-100, rel.reputation));
+        } else {
+          // Reject
+          rel.pendingProposals = rel.pendingProposals.filter(p => p !== proposal);
+          rel.reputation = Math.max(-100, rel.reputation - 5);
         }
       }
     }

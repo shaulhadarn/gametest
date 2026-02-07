@@ -51,6 +51,8 @@ export class FlightRenderer {
   private coronaMaterial: THREE.ShaderMaterial | null = null;
   private coronaMesh: THREE.Mesh | null = null;
   private engineGlow: THREE.PointLight | null = null;
+  private exhaustCones: THREE.Mesh[] = [];
+  private engineGlowMeshes: THREE.Mesh[] = [];
   private dustParticles: THREE.Points | null = null;
   private bgStars: THREE.Points | null = null;
   private speedDust: THREE.Points | null = null;
@@ -344,65 +346,227 @@ export class FlightRenderer {
   private buildShip(): void {
     this.shipGroup = new THREE.Group();
 
-    // Hull: sleek wedge shape
-    const hullGeom = new THREE.ConeGeometry(0.8, 4, 4);
-    hullGeom.rotateX(Math.PI / 2);
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0x445566, metalness: 0.8, roughness: 0.3,
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x3a4555, metalness: 0.85, roughness: 0.25,
     });
-    const hull = new THREE.Mesh(hullGeom, hullMat);
-    this.shipGroup.add(hull);
-
-    // Wings
-    const wingGeom = new THREE.BoxGeometry(4, 0.08, 1.2);
-    const wingMat = new THREE.MeshStandardMaterial({
-      color: 0x334455, metalness: 0.7, roughness: 0.4,
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x2a3545, metalness: 0.9, roughness: 0.2,
     });
-    const wings = new THREE.Mesh(wingGeom, wingMat);
-    wings.position.set(0, 0, 0.8);
-    this.shipGroup.add(wings);
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: 0x556677, metalness: 0.7, roughness: 0.35,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2030, metalness: 0.95, roughness: 0.15,
+    });
 
-    // Canopy
-    const canopyGeom = new THREE.SphereGeometry(0.35, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    // === Main fuselage - tapered nose to wide mid to narrow tail ===
+    // Nose cone (sharp, elongated)
+    const noseGeom = new THREE.ConeGeometry(0.35, 2.4, 6);
+    noseGeom.rotateX(Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeom, bodyMat);
+    nose.position.set(0, 0, -2.8);
+    this.shipGroup.add(nose);
+
+    // Forward fuselage (widens from nose)
+    const fwdShape = new THREE.Shape();
+    fwdShape.moveTo(-0.5, -0.18);
+    fwdShape.lineTo(0.5, -0.18);
+    fwdShape.lineTo(0.55, 0.05);
+    fwdShape.lineTo(0.35, 0.25);
+    fwdShape.lineTo(-0.35, 0.25);
+    fwdShape.lineTo(-0.55, 0.05);
+    fwdShape.closePath();
+    const fwdGeom = new THREE.ExtrudeGeometry(fwdShape, { depth: 2.0, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 });
+    const fwdHull = new THREE.Mesh(fwdGeom, bodyMat);
+    fwdHull.position.set(0, 0, -1.6);
+    this.shipGroup.add(fwdHull);
+
+    // Mid fuselage (widest section)
+    const midShape = new THREE.Shape();
+    midShape.moveTo(-0.65, -0.2);
+    midShape.lineTo(0.65, -0.2);
+    midShape.lineTo(0.7, 0.05);
+    midShape.lineTo(0.45, 0.3);
+    midShape.lineTo(-0.45, 0.3);
+    midShape.lineTo(-0.7, 0.05);
+    midShape.closePath();
+    const midGeom = new THREE.ExtrudeGeometry(midShape, { depth: 1.6, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 });
+    const midHull = new THREE.Mesh(midGeom, bodyMat);
+    midHull.position.set(0, 0, 0.4);
+    this.shipGroup.add(midHull);
+
+    // Rear fuselage (narrows to engines)
+    const rearShape = new THREE.Shape();
+    rearShape.moveTo(-0.55, -0.18);
+    rearShape.lineTo(0.55, -0.18);
+    rearShape.lineTo(0.5, 0.08);
+    rearShape.lineTo(0.3, 0.22);
+    rearShape.lineTo(-0.3, 0.22);
+    rearShape.lineTo(-0.5, 0.08);
+    rearShape.closePath();
+    const rearGeom = new THREE.ExtrudeGeometry(rearShape, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2 });
+    const rearHull = new THREE.Mesh(rearGeom, panelMat);
+    rearHull.position.set(0, 0, 2.0);
+    this.shipGroup.add(rearHull);
+
+    // === Canopy (elongated cockpit bubble) ===
+    const canopyGeom = new THREE.SphereGeometry(0.32, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    canopyGeom.scale(1.0, 0.8, 2.0);
     const canopyMat = new THREE.MeshStandardMaterial({
-      color: 0x88ccff, metalness: 0.3, roughness: 0.1, transparent: true, opacity: 0.7,
+      color: 0x66bbee, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.65,
+      envMapIntensity: 2.0,
     });
     const canopy = new THREE.Mesh(canopyGeom, canopyMat);
-    canopy.position.set(0, 0.3, -0.4);
-    canopy.rotation.x = -Math.PI * 0.1;
+    canopy.position.set(0, 0.28, -1.2);
     this.shipGroup.add(canopy);
 
-    // Engine nozzles
-    for (const xOff of [-0.6, 0.6]) {
-      const nozzleGeom = new THREE.CylinderGeometry(0.15, 0.25, 0.6, 8);
-      nozzleGeom.rotateX(Math.PI / 2);
-      const nozzleMat = new THREE.MeshStandardMaterial({
-        color: 0x333344, metalness: 0.9, roughness: 0.2,
-      });
-      const nozzle = new THREE.Mesh(nozzleGeom, nozzleMat);
-      nozzle.position.set(xOff, -0.05, 1.8);
-      this.shipGroup.add(nozzle);
-
-      // Engine glow
-      const glowGeom = new THREE.SphereGeometry(0.12, 8, 6);
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0x4488ff, transparent: true, opacity: 0.8, toneMapped: false,
-      });
-      const glow = new THREE.Mesh(glowGeom, glowMat);
-      glow.position.set(xOff, -0.05, 2.1);
-      glow.layers.enable(BLOOM_LAYER);
-      this.shipGroup.add(glow);
+    // Canopy frame strips
+    for (const zOff of [-0.3, 0, 0.3]) {
+      const frameGeom = new THREE.BoxGeometry(0.56, 0.03, 0.025);
+      const frame = new THREE.Mesh(frameGeom, darkMat);
+      frame.position.set(0, 0.42, -1.2 + zOff);
+      this.shipGroup.add(frame);
     }
 
-    // Engine point light
-    this.engineGlow = new THREE.PointLight(0x4488ff, 2, 15);
-    this.engineGlow.position.set(0, 0, 2.5);
+    // === Main delta wings (swept) ===
+    for (const side of [-1, 1]) {
+      // Wing panel (swept triangle using shape)
+      const wingShape = new THREE.Shape();
+      wingShape.moveTo(0, 0);
+      wingShape.lineTo(2.8 * side, -0.4);
+      wingShape.lineTo(2.4 * side, -0.4);
+      wingShape.lineTo(1.8 * side, 0.3);
+      wingShape.lineTo(0, 1.0);
+      wingShape.closePath();
+      const wingGeom = new THREE.ExtrudeGeometry(wingShape, { depth: 0.06, bevelEnabled: false });
+      const wing = new THREE.Mesh(wingGeom, panelMat);
+      wing.rotation.x = Math.PI / 2;
+      wing.position.set(0, -0.05, -0.2);
+      this.shipGroup.add(wing);
+
+      // Wing stripe (accent line)
+      const stripeGeom = new THREE.BoxGeometry(1.6, 0.015, 0.08);
+      const stripe = new THREE.Mesh(stripeGeom, accentMat);
+      stripe.position.set(1.0 * side, -0.03, 0.3);
+      stripe.rotation.y = -0.15 * side;
+      this.shipGroup.add(stripe);
+
+      // Wingtip detail
+      const tipGeom = new THREE.BoxGeometry(0.15, 0.1, 0.4);
+      const tip = new THREE.Mesh(tipGeom, accentMat);
+      tip.position.set(2.65 * side, -0.05, 0.05);
+      this.shipGroup.add(tip);
+
+      // Wingtip nav light
+      const navLightGeom = new THREE.SphereGeometry(0.04, 6, 4);
+      const navLightMat = new THREE.MeshBasicMaterial({
+        color: side < 0 ? 0xff2244 : 0x22ff44, toneMapped: false,
+      });
+      const navLight = new THREE.Mesh(navLightGeom, navLightMat);
+      navLight.position.set(2.7 * side, -0.03, 0.15);
+      navLight.layers.enable(BLOOM_LAYER);
+      this.shipGroup.add(navLight);
+    }
+
+    // === Tail fins (vertical stabilizers) ===
+    for (const side of [-1, 1]) {
+      const finShape = new THREE.Shape();
+      finShape.moveTo(0, 0);
+      finShape.lineTo(0, 1.0);
+      finShape.lineTo(0.4, 0.7);
+      finShape.lineTo(0.5, 0);
+      finShape.closePath();
+      const finGeom = new THREE.ExtrudeGeometry(finShape, { depth: 0.04, bevelEnabled: false });
+      const fin = new THREE.Mesh(finGeom, panelMat);
+      fin.position.set(0.5 * side, 0.15, 2.4);
+      fin.rotation.y = 0.15 * side;
+      this.shipGroup.add(fin);
+    }
+
+    // === Horizontal stabilizers (small rear wings) ===
+    for (const side of [-1, 1]) {
+      const stabGeom = new THREE.BoxGeometry(1.2, 0.04, 0.5);
+      const stab = new THREE.Mesh(stabGeom, panelMat);
+      stab.position.set(0.6 * side, 0.0, 2.8);
+      stab.rotation.z = 0.05 * side;
+      this.shipGroup.add(stab);
+    }
+
+    // === Engine nacelles (twin) ===
+    for (const xOff of [-0.5, 0.5]) {
+      // Nacelle body
+      const nacGeom = new THREE.CylinderGeometry(0.18, 0.22, 1.6, 10);
+      nacGeom.rotateX(Math.PI / 2);
+      const nacelle = new THREE.Mesh(nacGeom, darkMat);
+      nacelle.position.set(xOff, -0.08, 2.6);
+      this.shipGroup.add(nacelle);
+
+      // Intake ring
+      const intakeGeom = new THREE.TorusGeometry(0.2, 0.03, 6, 12);
+      intakeGeom.rotateX(Math.PI / 2);
+      const intake = new THREE.Mesh(intakeGeom, accentMat);
+      intake.position.set(xOff, -0.08, 1.8);
+      this.shipGroup.add(intake);
+
+      // Nozzle (flared exhaust)
+      const nozzleGeom = new THREE.CylinderGeometry(0.15, 0.26, 0.4, 10);
+      nozzleGeom.rotateX(Math.PI / 2);
+      const nozzle = new THREE.Mesh(nozzleGeom, darkMat);
+      nozzle.position.set(xOff, -0.08, 3.55);
+      this.shipGroup.add(nozzle);
+
+      // Inner nozzle glow
+      const glowGeom = new THREE.CylinderGeometry(0.13, 0.08, 0.3, 10);
+      glowGeom.rotateX(Math.PI / 2);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x4499ff, transparent: true, opacity: 0.9, toneMapped: false,
+      });
+      const glow = new THREE.Mesh(glowGeom, glowMat);
+      glow.position.set(xOff, -0.08, 3.7);
+      glow.layers.enable(BLOOM_LAYER);
+      this.shipGroup.add(glow);
+
+      // Exhaust cone (faint, extends behind)
+      const exhGeom = new THREE.ConeGeometry(0.2, 1.5, 8);
+      exhGeom.rotateX(-Math.PI / 2);
+      const exhMat = new THREE.MeshBasicMaterial({
+        color: 0x3366cc, transparent: true, opacity: 0.25, toneMapped: false,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const exhaust = new THREE.Mesh(exhGeom, exhMat);
+      exhaust.position.set(xOff, -0.08, 4.5);
+      exhaust.layers.enable(BLOOM_LAYER);
+      this.shipGroup.add(exhaust);
+      this.exhaustCones.push(exhaust);
+      this.engineGlowMeshes.push(glow);
+    }
+
+    // === Panel lines / surface detail ===
+    // Dorsal spine ridge
+    const spineGeom = new THREE.BoxGeometry(0.06, 0.08, 3.0);
+    const spine = new THREE.Mesh(spineGeom, accentMat);
+    spine.position.set(0, 0.28, 0.5);
+    this.shipGroup.add(spine);
+
+    // Ventral plate
+    const ventralGeom = new THREE.BoxGeometry(0.8, 0.03, 2.0);
+    const ventral = new THREE.Mesh(ventralGeom, darkMat);
+    ventral.position.set(0, -0.2, 0.5);
+    this.shipGroup.add(ventral);
+
+    // === Engine point light ===
+    this.engineGlow = new THREE.PointLight(0x4499ff, 2, 20);
+    this.engineGlow.position.set(0, -0.05, 4.0);
     this.shipGroup.add(this.engineGlow);
 
-    // Directional light to see the ship
-    const shipLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    shipLight.position.set(2, 3, -2);
+    // === Lighting for the ship ===
+    const shipLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    shipLight.position.set(2, 4, -3);
     this.shipGroup.add(shipLight);
+
+    const fillLight = new THREE.DirectionalLight(0x334466, 0.3);
+    fillLight.position.set(-2, -1, 1);
+    this.shipGroup.add(fillLight);
 
     this.shipGroup.position.copy(this.shipPosition);
     this.scene.add(this.shipGroup);
@@ -442,7 +606,22 @@ export class FlightRenderer {
     // Engine glow intensity based on speed
     if (this.engineGlow) {
       const speed = this.shipVelocity.length();
-      this.engineGlow.intensity = 1.5 + speed * 0.3;
+      this.engineGlow.intensity = 1.5 + speed * 0.4;
+      this.engineGlow.distance = 20 + speed * 0.5;
+
+      // Animate exhaust cones
+      for (const cone of this.exhaustCones) {
+        const scale = 0.5 + Math.min(speed * 0.08, 2.5);
+        cone.scale.set(scale * 0.7, scale * 0.7, scale);
+        const mat = cone.material as THREE.MeshBasicMaterial;
+        mat.opacity = Math.min(0.5, 0.1 + speed * 0.02);
+      }
+
+      // Pulsate engine glow meshes
+      for (const glowMesh of this.engineGlowMeshes) {
+        const mat = glowMesh.material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.7 + Math.sin(this.time * 8) * 0.15 + Math.min(speed * 0.01, 0.15);
+      }
     }
 
     // Speed dust - visible and moving relative to ship when fast
@@ -495,6 +674,8 @@ export class FlightRenderer {
     this.coronaMaterial = null;
     this.coronaMesh = null;
     this.engineGlow = null;
+    this.exhaustCones = [];
+    this.engineGlowMeshes = [];
     this.dustParticles = null;
     this.bgStars = null;
     this.speedDust = null;

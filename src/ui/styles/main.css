@@ -2885,6 +2885,7 @@
 }
 
 /* ========== Flight Mode ========== */
+/* ========== Flight UI ========== */
 .flight-ui {
   position: absolute;
   top: 0;
@@ -2901,9 +2902,10 @@
   position: relative;
 }
 
+/* --- Top bar --- */
 .flight-hud-top {
   position: absolute;
-  top: 16px;
+  top: 12px;
   left: 16px;
   right: 16px;
   display: flex;
@@ -2912,11 +2914,34 @@
   pointer-events: auto;
 }
 
+.flight-hud-top-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+}
+
+.flight-heading-bar {
+  background: rgba(0, 8, 20, 0.5);
+  border: 1px solid rgba(68, 136, 255, 0.2);
+  border-radius: 2px;
+  padding: 4px 18px;
+  text-align: center;
+}
+
+.flight-heading-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: rgba(68, 136, 255, 0.8);
+  letter-spacing: 3px;
+}
+
 .flight-exit-btn {
-  font-size: 12px !important;
-  padding: 8px 16px !important;
-  opacity: 0.7;
+  font-size: 10px !important;
+  padding: 6px 14px !important;
+  opacity: 0.5;
   transition: opacity 0.2s;
+  letter-spacing: 2px;
 }
 
 .flight-exit-btn:hover {
@@ -2927,65 +2952,220 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  background: rgba(0, 8, 20, 0.6);
-  border: 1px solid rgba(68, 136, 255, 0.3);
-  border-radius: var(--border-radius);
-  padding: 8px 14px;
+  background: rgba(0, 8, 20, 0.5);
+  border: 1px solid rgba(68, 136, 255, 0.2);
+  border-radius: 2px;
+  padding: 6px 12px;
 }
 
 .flight-speed-label {
   font-family: var(--font-display);
-  font-size: 8px;
+  font-size: 7px;
   letter-spacing: 2px;
-  color: var(--color-text-dim);
+  color: rgba(255, 255, 255, 0.3);
   text-transform: uppercase;
 }
 
 .flight-speed-value {
   font-family: var(--font-mono);
-  font-size: 28px;
-  color: var(--color-accent);
+  font-size: 26px;
+  color: rgba(68, 136, 255, 0.9);
   line-height: 1;
 }
 
-/* Crosshair */
+.flight-speed-unit {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: rgba(68, 136, 255, 0.4);
+  letter-spacing: 1px;
+}
+
+/* --- Crosshair (sci-fi reticle) --- */
 .flight-crosshair {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
+  width: 80px;
+  height: 80px;
   pointer-events: none;
 }
 
-.flight-crosshair::before,
-.flight-crosshair::after {
-  content: '';
+.flight-crosshair-inner {
   position: absolute;
-  background: rgba(68, 136, 255, 0.4);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(68, 136, 255, 0.3);
+  border-radius: 50%;
 }
 
-.flight-crosshair::before {
+.flight-crosshair-dot {
+  position: absolute;
+  top: 50%;
   left: 50%;
-  top: 0;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 2px;
+  background: rgba(68, 136, 255, 0.7);
+  border-radius: 50%;
+}
+
+.flight-crosshair-line {
+  position: absolute;
+  background: rgba(68, 136, 255, 0.3);
+}
+
+.flight-crosshair-top {
   width: 1px;
-  height: 100%;
+  height: 16px;
+  top: 4px;
+  left: 50%;
   transform: translateX(-50%);
 }
 
-.flight-crosshair::after {
-  top: 50%;
-  left: 0;
-  width: 100%;
+.flight-crosshair-bottom {
+  width: 1px;
+  height: 16px;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.flight-crosshair-left {
   height: 1px;
+  width: 16px;
+  left: 4px;
+  top: 50%;
   transform: translateY(-50%);
 }
 
-/* Controls hints */
+.flight-crosshair-right {
+  height: 1px;
+  width: 16px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* --- Left HUD panel (throttle/boost) --- */
+.flight-hud-left {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.flight-throttle-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.flight-gauge-label {
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.flight-gauge-bar-bg {
+  width: 6px;
+  height: 100px;
+  background: rgba(68, 136, 255, 0.08);
+  border: 1px solid rgba(68, 136, 255, 0.15);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.flight-gauge-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  background: linear-gradient(to top, rgba(68, 136, 255, 0.6), rgba(100, 180, 255, 0.8));
+  transition: height 0.15s ease-out;
+  border-radius: 1px;
+}
+
+.flight-gauge-value {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(68, 136, 255, 0.5);
+}
+
+.flight-boost-indicator {
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 170, 0, 0.15);
+  border-radius: 2px;
+  background: rgba(255, 170, 0, 0.03);
+  transition: all 0.15s;
+}
+
+.flight-boost-indicator.active {
+  border-color: rgba(255, 170, 0, 0.6);
+  background: rgba(255, 170, 0, 0.15);
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.2);
+}
+
+.flight-boost-label {
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(255, 170, 0, 0.35);
+  transition: color 0.15s;
+}
+
+.flight-boost-indicator.active .flight-boost-label {
+  color: rgba(255, 170, 0, 0.9);
+}
+
+/* --- Right HUD panel (info) --- */
+.flight-hud-right {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flight-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.flight-info-label {
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.flight-info-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: rgba(68, 136, 255, 0.7);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* --- Controls hints --- */
 .flight-controls-hint {
   position: absolute;
-  bottom: 24px;
+  bottom: 16px;
   left: 0;
   right: 0;
   text-align: center;
@@ -2993,16 +3173,17 @@
 
 .flight-hint-desktop {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-dim);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
   letter-spacing: 1px;
-  background: rgba(0, 8, 20, 0.5);
-  padding: 8px 20px;
-  border-radius: var(--border-radius);
+  background: rgba(0, 8, 20, 0.4);
+  padding: 6px 18px;
+  border-radius: 2px;
   display: inline-block;
+  border: 1px solid rgba(68, 136, 255, 0.08);
 }
 
-/* Mobile touch controls */
+/* --- Mobile touch controls --- */
 .flight-hint-mobile {
   display: none;
 }
@@ -3027,16 +3208,16 @@
 .flight-touch-joystick-ring {
   width: 120px;
   height: 120px;
-  border: 2px solid rgba(68, 136, 255, 0.3);
+  border: 2px solid rgba(68, 136, 255, 0.2);
   border-radius: 50%;
-  background: rgba(68, 136, 255, 0.05);
+  background: rgba(68, 136, 255, 0.03);
 }
 
 .flight-touch-label {
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 2px;
-  color: rgba(68, 136, 255, 0.5);
+  color: rgba(68, 136, 255, 0.4);
   margin-top: 6px;
 }
 
@@ -3054,9 +3235,9 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  border: 2px solid rgba(68, 136, 255, 0.3);
-  background: rgba(68, 136, 255, 0.08);
-  color: rgba(68, 136, 255, 0.7);
+  border: 2px solid rgba(68, 136, 255, 0.2);
+  background: rgba(68, 136, 255, 0.05);
+  color: rgba(68, 136, 255, 0.6);
   font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 1px;
@@ -3068,14 +3249,14 @@
 }
 
 .flight-touch-btn:active {
-  background: rgba(68, 136, 255, 0.25);
-  border-color: rgba(68, 136, 255, 0.6);
+  background: rgba(68, 136, 255, 0.2);
+  border-color: rgba(68, 136, 255, 0.5);
   color: var(--color-accent);
 }
 
 .flight-touch-boost:active {
-  background: rgba(255, 170, 0, 0.2);
-  border-color: rgba(255, 170, 0, 0.5);
+  background: rgba(255, 170, 0, 0.15);
+  border-color: rgba(255, 170, 0, 0.4);
   color: var(--color-warning);
 }
 
@@ -3098,12 +3279,17 @@
     right: 8px;
   }
 
+  .flight-hud-left,
+  .flight-hud-right {
+    display: none;
+  }
+
   .flight-speed-display {
-    padding: 6px 10px;
+    padding: 4px 8px;
   }
 
   .flight-speed-value {
-    font-size: 22px;
+    font-size: 20px;
   }
 }
 

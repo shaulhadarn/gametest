@@ -311,7 +311,7 @@ export class FlightUI implements ScreenComponent {
     // steerX positive = mouse/touch right = ship turns right (yaw decreases)
     // steerY positive = mouse/touch down = ship pitches down (natural/non-inverse)
     renderer.shipRotation.y -= steerX * SHIP_TURN_SPEED * dt;
-    renderer.shipRotation.x += steerY * SHIP_PITCH_SPEED * dt;
+    renderer.shipRotation.x -= steerY * SHIP_PITCH_SPEED * dt;
 
     // Manual roll with Q/E
     let manualRoll = 0;

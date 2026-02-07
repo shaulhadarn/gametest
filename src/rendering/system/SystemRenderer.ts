@@ -503,7 +503,7 @@ export class SystemRenderer {
     this.selectedPlanetId = planetId;
     const orbit = this.planetOrbits.find(o => o.planetId === planetId);
     if (orbit && this.selectionRing) {
-      const planetSize = (orbit.mesh.geometry as THREE.SphereGeometry).parameters.radius;
+      const planetSize = orbit.planetSize;
       this.selectionRing.position.set(orbit.mesh.position.x, -0.3, orbit.mesh.position.z);
       this.selectionRing.scale.setScalar(planetSize * 0.8);
       this.selectionRing.visible = true;

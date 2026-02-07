@@ -61,6 +61,8 @@ export interface GameEvents {
   'diplomacy:proposal': { fromId: string; toId: string; type: string };
   'diplomacy:war': { player1Id: string; player2Id: string };
   'diplomacy:peace': { player1Id: string; player2Id: string };
+  'diplomacy:firstContact': { playerId: string; otherPlayerId: string };
+  'diplomacy:message': { fromId: string; toId: string; type: string };
 
   // Victory
   'victory:achieved': { playerId: string; type: string };

@@ -671,6 +671,11 @@
 .slide-up { animation: slideUp 0.3s ease; }
 .pulse { animation: pulse 1.5s ease-in-out infinite; }
 
+@keyframes centeredModalIn {
+  from { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
 /* New game setup */
 .new-game-setup {
   position: absolute;
@@ -2513,6 +2518,10 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   }
 
+  .star-info-panel.slide-up {
+    animation: centeredModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   .planet-detail-panel {
     position: fixed;
     top: 50%;
@@ -2527,6 +2536,10 @@
     border-radius: var(--border-radius);
     z-index: 160;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  }
+
+  .planet-detail-panel.slide-up {
+    animation: centeredModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* --- Colony / Ship / Tech / Diplomacy grids --- */
@@ -2791,18 +2804,143 @@
   }
 
   /* --- Colony screen mobile --- */
+  .colony-screen {
+    padding: 10px;
+    gap: 10px;
+  }
+
   .colony-header {
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 8px;
+    align-items: stretch;
   }
 
   .colony-header-left {
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
   }
 
   .colony-header h2 {
     font-size: 16px;
+  }
+
+  .colony-header-sub {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .colony-header-right {
+    justify-content: space-between;
+  }
+
+  .colony-header-right .btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .colony-grid {
+    gap: 10px;
+  }
+
+  .colony-sidebar-left,
+  .colony-sidebar-right,
+  .colony-center {
+    gap: 10px;
+  }
+
+  .colony-sidebar-left .panel,
+  .colony-sidebar-right .panel,
+  .colony-center .panel {
+    padding: 12px;
+  }
+
+  .panel-header {
+    font-size: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+  }
+
+  .colony-planet-preview-wrap {
+    margin-bottom: 4px;
+  }
+
+  .colony-planet-name {
+    font-size: 12px;
+  }
+
+  .colony-planet-stat {
+    font-size: 10px;
+  }
+
+  .worker-row {
+    gap: 8px;
+  }
+
+  .worker-row label {
+    width: 70px;
+    font-size: 10px;
+  }
+
+  .worker-row .worker-count {
+    width: 24px;
+    font-size: 12px;
+  }
+
+  .output-row {
+    gap: 6px;
+  }
+
+  .output-label {
+    width: 60px;
+    font-size: 10px;
+  }
+
+  .output-value {
+    width: 36px;
+    font-size: 11px;
+  }
+
+  .building-card {
+    padding: 8px;
+  }
+
+  .building-card-name {
+    font-size: 11px;
+  }
+
+  .building-card-desc {
+    font-size: 9px;
+  }
+
+  .building-effect-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  .build-queue-item {
+    padding: 6px;
+  }
+
+  .build-queue-item-name {
+    font-size: 11px;
+  }
+
+  .colony-build-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .colony-build-actions .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .colony-food-balance {
+    padding: 6px 10px;
+  }
+
+  .colony-economy-grid {
+    font-size: 11px;
   }
 
   /* --- Research screen mobile --- */
@@ -3046,18 +3184,45 @@
   }
 
   /* --- Colony screen small --- */
+  .colony-screen {
+    padding: 8px;
+    gap: 8px;
+  }
+
   .colony-header h2 {
     font-size: 14px;
   }
 
-  .colony-screen {
-    padding: 10px;
+  .colony-header-right .btn {
+    min-height: 38px;
+    font-size: 11px;
+    padding: 8px 10px;
   }
 
   .planet-preview-wrapper,
   .planet-preview-canvas {
     width: 90px;
     height: 90px;
+  }
+
+  .colony-sidebar-left .panel,
+  .colony-sidebar-right .panel,
+  .colony-center .panel {
+    padding: 10px;
+  }
+
+  .worker-row label {
+    width: 60px;
+    font-size: 9px;
+  }
+
+  .output-label {
+    width: 50px;
+    font-size: 9px;
+  }
+
+  .colony-build-actions .btn {
+    min-height: 40px;
   }
 
   /* --- Build menu small --- */

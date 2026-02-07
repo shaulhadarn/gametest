@@ -13,7 +13,7 @@ export interface GameEvents {
 
   // View transitions
   'view:galaxy': {};
-  'view:system': { starId: string };
+  'view:system': { starId: string; planetId?: string };
   'view:colony': { colonyId: string };
   'view:research': {};
   'view:shipDesign': {};

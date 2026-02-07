@@ -3327,6 +3327,12 @@ canvas {
   color: var(--color-warning);
 }
 
+.flight-touch-brake:active {
+  background: rgba(255, 80, 80, 0.15);
+  border-color: rgba(255, 80, 80, 0.4);
+  color: #ff5050;
+}
+
 @media (max-width: 768px) {
   .flight-hint-desktop {
     display: none;

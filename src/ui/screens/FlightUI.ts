@@ -1,6 +1,6 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Fixed pinch zoom direction (pinch-out=zoom in), fixed joystick zone conflict
-// with document touch handler, document-level touch for pinch zoom, canvas drag steers ship
+// Updated: Rebuilt mobile controls - ship auto-thrusts forward, left joystick steers direction,
+// canvas drag only orbits camera, camera auto-centers behind ship quickly on mobile
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -43,6 +43,7 @@ export class FlightUI implements ScreenComponent {
   private touchJoystickDelta = { x: 0, y: 0 };
   private touchThrottleActive = false;
   private touchBoostActive = false;
+  private touchBrakeActive = false;
 
   // Touch state - camera orbit (right zone / canvas)
   private touchCameraId: number | null = null;
@@ -181,7 +182,7 @@ export class FlightUI implements ScreenComponent {
           <div class="flight-touch-label">STEER</div>
         </div>
         <div class="flight-touch-buttons">
-          <button class="flight-touch-btn flight-touch-throttle" id="flight-touch-throttle">THRUST</button>
+          <button class="flight-touch-btn flight-touch-brake" id="flight-touch-brake">BRAKE</button>
           <button class="flight-touch-btn flight-touch-boost" id="flight-touch-boost">BOOST</button>
         </div>
       </div>
@@ -205,10 +206,10 @@ export class FlightUI implements ScreenComponent {
       touchLeft.addEventListener('touchend', this.onTouchEndHandler, { passive: false });
     }
 
-    const throttleBtn = this.element.querySelector('#flight-touch-throttle') as HTMLElement | null;
-    if (throttleBtn) {
-      throttleBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchThrottleActive = true; }, { passive: false });
-      throttleBtn.addEventListener('touchend', () => { this.touchThrottleActive = false; });
+    const brakeBtn = this.element.querySelector('#flight-touch-brake') as HTMLElement | null;
+    if (brakeBtn) {
+      brakeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchThrottleActive = false; this.touchBrakeActive = true; }, { passive: false });
+      brakeBtn.addEventListener('touchend', () => { this.touchBrakeActive = false; });
     }
 
     const boostBtn = this.element.querySelector('#flight-touch-boost') as HTMLElement | null;
@@ -261,6 +262,9 @@ export class FlightUI implements ScreenComponent {
     this.touchCameraId = null;
     this.touchPinchDist = null;
     this.isPinching = false;
+    this.touchBrakeActive = false;
+    this.touchBoostActive = false;
+    this.touchThrottleActive = false;
     this.mouseX = 0;
     this.mouseY = 0;
     this.frameOrbitX = 0;
@@ -303,11 +307,11 @@ export class FlightUI implements ScreenComponent {
     const boost = this.isBoosting ? SHIP_BOOST_MULTIPLIER : 1;
     const speed = SHIP_SPEED * boost;
 
-    // Steering from mouse (pointer lock), canvas drag, and/or touch joystick
+    // Steering from mouse (pointer lock) or touch joystick
     let steerX = 0;
     let steerY = 0;
 
-    if (this.isPointerLocked || (this.isMobile && (Math.abs(this.mouseX) > 0.01 || Math.abs(this.mouseY) > 0.01))) {
+    if (this.isPointerLocked) {
       steerX += this.mouseX * 0.003;
       steerY += this.mouseY * 0.003;
       // Smooth mouse decay (frame-independent)
@@ -315,7 +319,7 @@ export class FlightUI implements ScreenComponent {
       this.mouseX *= mouseDecay;
       this.mouseY *= mouseDecay;
     }
-    // Joystick always adds on top (not exclusive with canvas drag)
+    // Mobile joystick steers the ship (canvas drag is camera-only on mobile)
     if (this.touchJoystickId !== null) {
       steerX += this.touchJoystickDelta.x * 0.04;
       steerY += this.touchJoystickDelta.y * 0.04;
@@ -338,9 +342,10 @@ export class FlightUI implements ScreenComponent {
       renderer.shipRotation.z += (targetRoll - renderer.shipRotation.z) * SHIP_ROLL_SPEED * rollLerp;
     }
 
-    // Thrust
-    const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || this.touchThrottleActive;
-    const isBraking = this.keys.has('s') || this.keys.has('arrowdown');
+    // Thrust: on mobile, ship always moves forward unless braking
+    const mobileAutoThrust = this.isMobile && !this.touchBrakeActive;
+    const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || mobileAutoThrust;
+    const isBraking = this.keys.has('s') || this.keys.has('arrowdown') || this.touchBrakeActive;
 
     if (isThrusting) {
       renderer.shipVelocity.addScaledVector(forward, speed * dt);
@@ -413,7 +418,8 @@ export class FlightUI implements ScreenComponent {
     if (speedEl) speedEl.textContent = String(speed);
 
     // Throttle gauge
-    const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || this.touchThrottleActive;
+    const mobileAutoThrust = this.isMobile && !this.touchBrakeActive;
+    const isThrusting = this.keys.has('w') || this.keys.has('arrowup') || mobileAutoThrust;
     const throttlePct = isThrusting ? (this.isBoosting ? 100 : 65) : 0;
     const fillEl = this.element.querySelector('#flight-throttle-fill') as HTMLElement | null;
     if (fillEl) fillEl.style.height = `${throttlePct}%`;
@@ -579,7 +585,7 @@ export class FlightUI implements ScreenComponent {
       this.frameZoomDelta += pinchDelta * CameraConfig.PINCH_ZOOM_SPEED;
       this.touchPinchDist = newDist;
     } else if (e.touches.length === 1 && this.touchCameraId !== null && !this.isPinching) {
-      // Single finger drag: steer ship + orbit camera
+      // Single finger drag: camera orbit only (ship steering is joystick-only on mobile)
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === this.touchCameraId) {
@@ -588,9 +594,6 @@ export class FlightUI implements ScreenComponent {
           if (Math.abs(dx) > TOUCH_DEAD_ZONE || Math.abs(dy) > TOUCH_DEAD_ZONE) {
             this.frameOrbitX += dx;
             this.frameOrbitY += dy;
-            // Also feed ship steering so dragging changes direction
-            this.mouseX += dx * 0.8;
-            this.mouseY += dy * 0.8;
           }
           this.touchCameraLastPos = { x: touch.clientX, y: touch.clientY };
         }

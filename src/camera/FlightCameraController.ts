@@ -179,10 +179,12 @@ export class FlightCameraController {
     this.targetPitch -= input.orbitDeltaY * sensY;
     this.targetPitch = clamp(this.targetPitch, CameraConfig.MIN_PITCH, CameraConfig.MAX_PITCH);
 
-    // --- Auto-center: slowly return yaw to 0 when no input ---
-    if (this.timeSinceLastInput > CameraConfig.AUTO_CENTER_DELAY) {
-      this.targetYaw = expDecayLerp(this.targetYaw, 0, CameraConfig.AUTO_CENTER_SPEED, dt);
-      this.targetPitch = expDecayLerp(this.targetPitch, params.pitch, CameraConfig.AUTO_CENTER_SPEED * 0.5, dt);
+    // --- Auto-center: return yaw to 0 when no input (faster on mobile) ---
+    const autoCenterDelay = this.isMobile ? CameraConfig.AUTO_CENTER_DELAY_MOBILE : CameraConfig.AUTO_CENTER_DELAY;
+    const autoCenterSpeed = this.isMobile ? CameraConfig.AUTO_CENTER_SPEED_MOBILE : CameraConfig.AUTO_CENTER_SPEED;
+    if (this.timeSinceLastInput > autoCenterDelay) {
+      this.targetYaw = expDecayLerp(this.targetYaw, 0, autoCenterSpeed, dt);
+      this.targetPitch = expDecayLerp(this.targetPitch, params.pitch, autoCenterSpeed * 0.5, dt);
     }
 
     // --- Smooth orbit ---

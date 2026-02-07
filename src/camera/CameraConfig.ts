@@ -47,7 +47,9 @@ export const CameraConfig = {
 
   // --- Auto-center ---
   AUTO_CENTER_DELAY: 3.0,
+  AUTO_CENTER_DELAY_MOBILE: 0.5,
   AUTO_CENTER_SPEED: 1.5,
+  AUTO_CENTER_SPEED_MOBILE: 4.0,
 
   // --- Touch dead zone ---
   TOUCH_DEAD_ZONE: 2,

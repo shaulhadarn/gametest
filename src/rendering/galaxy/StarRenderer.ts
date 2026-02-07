@@ -1,8 +1,8 @@
 // StarRenderer.ts - Renders stars, glows, labels, and selection indicators in galaxy view
-// Updated: Fixed setVisible() to re-apply fog of war when returning to galaxy view,
-// preventing flash of all stars being visible before fog is applied
+// Updated: applyFogOfWar now explicitly shows explored stars' glows/labels/indicators,
+// fixing glows missing after returning from flight mode
+// setVisible() re-applies fog of war to prevent flash of all stars
 // Added frustum culling (50-70% draw call reduction) + LOD system (vertex count reduction)
-// applyFogOfWar() dims unexplored stars, revealStars() restores them when fleets explore
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
@@ -407,7 +407,12 @@ export class StarRenderer {
       const starId = this.starIdMap.get(i);
       const isExplored = starId ? exploredStarIds.has(starId) : false;
 
-      if (!isExplored) {
+      if (isExplored) {
+        // Ensure explored stars' glows, labels, and indicators are visible
+        if (i < this.glowSprites.length) this.glowSprites[i].visible = true;
+        if (i < this.labels.length) this.labels[i].visible = true;
+        if (i < this.ownerIndicators.length) this.ownerIndicators[i].visible = true;
+      } else {
         // Dim unexplored stars to near-invisible
         this.starMesh.setColorAt(i, dimColor);
         if (this.starMeshLOD) this.starMeshLOD.setColorAt(i, dimColor);

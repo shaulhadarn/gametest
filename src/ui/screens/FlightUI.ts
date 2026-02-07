@@ -1,7 +1,6 @@
 // FlightUI.ts - Third-person flight controls and camera for exploring star systems
-// Updated: Fixed mobile pinch zoom by binding touch to document instead of canvas,
-// so second finger is captured even when landing on HUD overlay
-// Canvas drag steers ship, smooth finger transitions between steer and pinch
+// Updated: Fixed mobile touch cleanup - reset all touch state on hide, touch-action in CSS
+// Document-level touch for pinch zoom, canvas drag steers ship
 
 import * as THREE from 'three';
 import { EventBus } from '@/core/EventBus';
@@ -189,11 +188,7 @@ export class FlightUI implements ScreenComponent {
     `;
     container.appendChild(this.element);
 
-    // Set touch-action: none on canvas and overlay to prevent browser gestures
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
-    if (canvas) {
-      canvas.style.touchAction = 'none';
-    }
+    // touch-action:none is set globally in CSS on canvas
     this.element.style.touchAction = 'none';
 
     // Wire events
@@ -260,10 +255,17 @@ export class FlightUI implements ScreenComponent {
     document.removeEventListener('touchmove', this.onCanvasTouchMove);
     document.removeEventListener('touchend', this.onCanvasTouchEnd);
 
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
-    if (canvas) {
-      canvas.style.touchAction = '';
-    }
+    // Reset all touch state to prevent stale state leaking into galaxy view
+    this.touchJoystickId = null;
+    this.touchJoystickDelta = { x: 0, y: 0 };
+    this.touchCameraId = null;
+    this.touchPinchDist = null;
+    this.isPinching = false;
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.frameOrbitX = 0;
+    this.frameOrbitY = 0;
+    this.frameZoomDelta = 0;
 
     // Restore resource bar
     const resourceBar = document.querySelector('.resource-bar') as HTMLElement | null;
